@@ -1,0 +1,23 @@
+{
+  "name": "ai-study-partner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "dev": "cd apps/web && vite",
+    "build": "cd apps/web && vite build",
+    "preview": "cd apps/web && vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.5",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.7.2",
+    "vue-tsc": "^2.2.0",
+    "unocss": "^66.0.0",
+    "@unocss/preset-uno": "^66.0.0",
+    "@unocss/preset-icons": "^66.0.0",
+    "@unocss/preset-web-fonts": "^66.0.0",
+    "@iconify-json/carbon": "^1.2.0"
+  }
+}

@@ -1,0 +1,23 @@
+
+> @proj-airi/audio@ build D:\AiPorject\Juju\airi-0.9.0-alpha.1\packages\audio
+> tsdown
+
+[34mℹ[39m tsdown [2mv0.20.3[22m powered by rolldown [2mv1.0.0-rc.3[22m
+[34mℹ[39m config file: [4mD:\AiPorject\Juju\airi-0.9.0-alpha.1\packages\audio\tsdown.config.ts[24m 
+[34mℹ[39m entry: [34msrc\index.ts, src\audio-context\index.ts, src\audio-context\processor.worklet.ts, src\encoding\index.ts[39m
+[34mℹ[39m tsconfig: [34mtsconfig.json[39m
+[34mℹ[39m Build start
+[34mℹ[39m [2mdist\[22m[1maudio-context\index.mjs[22m                [2m6.44 kB[22m [2m│ gzip: 1.78 kB[22m
+[33m[PLUGIN_TIMINGS] Warning:[0m Your build spent significant time in plugin `rolldown-plugin-dts:generate`. See https://rolldown.rs/options/checks#plugintimings for more details.
+
+[34mℹ[39m [2mdist\[22m[1maudio-context\processor.worklet.mjs[22m    [2m3.68 kB[22m [2m│ gzip: 1.14 kB[22m
+[34mℹ[39m [2mdist\[22m[1mindex.mjs[22m                              [2m0.12 kB[22m [2m│ gzip: 0.09 kB[22m
+[34mℹ[39m [2mdist\[22m[1mencoding\index.mjs[22m                     [2m0.08 kB[22m [2m│ gzip: 0.07 kB[22m
+[34mℹ[39m [2mdist\[22mencoding\wav.mjs                       [2m1.44 kB[22m [2m│ gzip: 0.57 kB[22m
+[34mℹ[39m [2mdist\[22m[32m[1maudio-context\index.d.mts[22m[39m              [2m2.05 kB[22m [2m│ gzip: 0.64 kB[22m
+[34mℹ[39m [2mdist\[22m[32m[1mindex.d.mts[22m[39m                            [2m0.09 kB[22m [2m│ gzip: 0.08 kB[22m
+[34mℹ[39m [2mdist\[22m[32m[1mencoding\index.d.mts[22m[39m                   [2m0.08 kB[22m [2m│ gzip: 0.07 kB[22m
+[34mℹ[39m [2mdist\[22m[32m[1maudio-context\processor.worklet.d.mts[22m[39m  [2m0.01 kB[22m [2m│ gzip: 0.03 kB[22m
+[34mℹ[39m [2mdist\[22m[32mencoding\wav.d.mts[39m                     [2m0.26 kB[22m [2m│ gzip: 0.17 kB[22m
+[34mℹ[39m 10 files, total: 14.23 kB
+[32m✔[39m Build complete in [32m10503ms[39m
