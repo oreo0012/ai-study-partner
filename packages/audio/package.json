@@ -1,0 +1,33 @@
+{
+  "name": "@ai-study-partner/audio",
+  "type": "module",
+  "private": true,
+  "description": "Audio processing utilities for AI Study Partner",
+  "author": {
+    "name": "AI Study Partner Team"
+  },
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./encoding": {
+      "types": "./dist/encoding/index.d.mts",
+      "default": "./dist/encoding/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsdown"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/audioworklet": "^0.0.96"
+  }
+}

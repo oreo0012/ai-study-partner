@@ -1,0 +1,45 @@
+//#region src/locales/fr/tamagotchi/stage.yaml
+var data = {
+	"operations": {
+		"load-models": "Charger Modèle",
+		"load-models-status": {
+			"loading": "Chargement",
+			"ready": "Prêt"
+		}
+	},
+	"docs": { "theme": { "navbar": { "appearance": { "title": "Apparence" } } } },
+	"controls-island": {
+		"fade-on-hover": {
+			"enable": "Masquer au survol",
+			"disable": "Toujours afficher"
+		},
+		"open-settings": "Open settings",
+		"open-chat": "Open Chat",
+		"refresh": "Refresh",
+		"open-hearing-controls": "Open hearing Controls",
+		"drag-to-move-window": "Drag to move window",
+		"switch-to-light-mode": "Switch to light mode",
+		"switch-to-dark-mode": "Switch to dark mode",
+		"close": "Close",
+		"expand": "Expand",
+		"collapse": "Collapse"
+	},
+	"notice": { "fade-on-hover": {
+		"title": "Disparaître au survol",
+		"intro": "Fait disparaître légèrement le personnage quand le curseur s’approche. Moins de distractions tout en restant visible.",
+		"opacity": "Une fois activé, l’opacité descend à {value} pour {targets} quand le curseur est à proximité.",
+		"toggle": "Vous pouvez le désactiver en survolant l’{controls}, puis en cliquant à nouveau sur l’{icon}.",
+		"controls-label": "Îlot de commandes",
+		"icon-label": "icône œil barré",
+		"value": "0",
+		"targets": "Personnage et UI",
+		"confirm": "Compris",
+		"dont-show-again": "Ne plus afficher",
+		"preparing": "Préparation…",
+		"read-more": "En savoir plus",
+		"preview-title": "C’est quoi ?"
+	} }
+};
+
+//#endregion
+export { data as default };
