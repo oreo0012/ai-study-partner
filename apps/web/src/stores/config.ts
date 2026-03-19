@@ -1,10 +1,12 @@
 import type { AppConfig } from '@/config/types'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { loadConfig, clearConfigCache } from '@/config/loader'
+import { loadConfig, clearConfigCache, type ConfigLoadResult } from '@/config/loader'
 
 export const useConfigStore = defineStore('config', () => {
   const config = ref<AppConfig | null>(null)
+  const soulContent = ref<string>('')
+  const soulSource = ref<'file' | 'default' | 'fallback'>('default')
   const loading = ref(false)
   const error = ref<string | null>(null)
   const loaded = ref(false)
@@ -30,7 +32,10 @@ export const useConfigStore = defineStore('config', () => {
     error.value = null
 
     try {
-      config.value = await loadConfig()
+      const result: ConfigLoadResult = await loadConfig()
+      config.value = result.config
+      soulContent.value = result.soulContent
+      soulSource.value = result.soulSource
       loaded.value = true
       return config.value
     } catch (e) {
@@ -49,6 +54,8 @@ export const useConfigStore = defineStore('config', () => {
 
   return {
     config,
+    soulContent,
+    soulSource,
     loading,
     error,
     loaded,

@@ -8,12 +8,14 @@ export interface LLMConfig {
 }
 
 export interface TTSConfig {
-  provider: 'openai' | 'elevenlabs' | 'edge-tts' | 'openai-compatible' | 'minimax'
+  provider: 'openai' | 'elevenlabs' | 'edge-tts' | 'openai-compatible' | 'minimax' | 'volcengine'
   apiKey: string
   baseUrl: string
   model: string
   voice: string
   speed?: number
+  appId?: string
+  resourceId?: string
 }
 
 export interface STTConfig {
@@ -26,9 +28,14 @@ export interface STTConfig {
 
 export interface CharacterConfig {
   name: string
-  systemPrompt: string
+  systemPrompt?: string
   personality?: string
   avatarUrl?: string
+}
+
+export interface SoulConfig {
+  path: string
+  enabled?: boolean
 }
 
 export interface Live2DConfig {
@@ -44,4 +51,5 @@ export interface AppConfig {
   stt: STTConfig
   character: CharacterConfig
   live2d?: Live2DConfig
+  soul?: SoulConfig
 }

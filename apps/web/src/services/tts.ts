@@ -1,4 +1,5 @@
-import type { SpeechProvider } from './providers/types'
+import type { SpeechProvider } from './providers/factory'
+import type { LipSyncResult } from './lipsync'
 
 export interface TTSOptions {
   text: string
@@ -8,11 +9,18 @@ export interface TTSOptions {
   signal?: AbortSignal
 }
 
+export interface TTSCallbacks {
+  onLipSync?: (result: LipSyncResult) => void
+  onPlayStart?: () => void
+  onPlayEnd?: () => void
+}
+
 export class TTSService {
   private provider: SpeechProvider
   private audioContext: AudioContext | null = null
   private currentSource: AudioBufferSourceNode | null = null
   private isPlaying = false
+  private lipSyncAnimationId: number | null = null
 
   constructor(provider: SpeechProvider) {
     this.provider = provider
@@ -27,6 +35,11 @@ export class TTSService {
 
   async synthesize(options: TTSOptions): Promise<ArrayBuffer> {
     const { text, model, voice, speed, signal } = options
+    
+    if (this.provider.synthesize) {
+      return this.provider.synthesize(text, signal)
+    }
+
     const config = this.provider.speech(model || '', voice)
 
     const response = await fetch(`${config.baseURL}audio/speech`, {
@@ -53,7 +66,7 @@ export class TTSService {
     return response.arrayBuffer()
   }
 
-  async speak(text: string, options: Omit<TTSOptions, 'text'> = {}): Promise<void> {
+  async speak(text: string, options: Omit<TTSOptions, 'text'> = {}, callbacks: TTSCallbacks = {}): Promise<void> {
     const audioContext = this.getAudioContext()
     
     this.stop()
@@ -64,23 +77,66 @@ export class TTSService {
     return new Promise((resolve, reject) => {
       const source = audioContext.createBufferSource()
       source.buffer = decodedBuffer
-      source.connect(audioContext.destination)
+      
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.5
+      
+      source.connect(analyser)
+      analyser.connect(audioContext.destination)
+      
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+      
+      const updateLipSync = () => {
+        if (!this.isPlaying) {
+          callbacks.onLipSync?.({ mouthOpenY: 0, isSpeaking: false, volume: 0 })
+          return
+        }
+        
+        analyser.getByteFrequencyData(dataArray)
+        
+        let sum = 0
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i]
+        }
+        
+        const average = sum / dataArray.length
+        const volume = average / 255
+        
+        let mouthOpenY = 0
+        if (average > 20) {
+          mouthOpenY = Math.min(0.8, Math.max(0.1, volume * 2))
+        }
+        
+        callbacks.onLipSync?.({ mouthOpenY, isSpeaking: average > 20, volume })
+        
+        this.lipSyncAnimationId = requestAnimationFrame(updateLipSync)
+      }
       
       source.onended = () => {
         this.isPlaying = false
         this.currentSource = null
+        if (this.lipSyncAnimationId) {
+          cancelAnimationFrame(this.lipSyncAnimationId)
+          this.lipSyncAnimationId = null
+        }
+        callbacks.onLipSync?.({ mouthOpenY: 0, isSpeaking: false, volume: 0 })
+        callbacks.onPlayEnd?.()
         resolve()
-      }
-
-      source.onerror = (e) => {
-        this.isPlaying = false
-        this.currentSource = null
-        reject(e)
       }
 
       this.currentSource = source
       this.isPlaying = true
-      source.start()
+      callbacks.onPlayStart?.()
+      
+      try {
+        source.start()
+        updateLipSync()
+      } catch (e) {
+        this.isPlaying = false
+        this.currentSource = null
+        reject(e)
+      }
     })
   }
 
@@ -92,6 +148,10 @@ export class TTSService {
         // ignore already stopped errors
       }
       this.currentSource = null
+    }
+    if (this.lipSyncAnimationId) {
+      cancelAnimationFrame(this.lipSyncAnimationId)
+      this.lipSyncAnimationId = null
     }
     this.isPlaying = false
   }
