@@ -1,0 +1,24 @@
+{
+  "userId": "child_001",
+  "createdAt": "2026-03-19T00:00:00Z",
+  "lastUpdated": "2026-03-19T00:00:00Z",
+  "profile": {
+    "name": "小朋友",
+    "age": 8,
+    "grade": "二年级"
+  },
+  "learningProgress": {
+    "totalTasks": 0,
+    "completedTasks": 0,
+    "completionRate": 0,
+    "totalStudyTime": 0,
+    "consecutiveDays": 0
+  },
+  "exerciseRecords": [],
+  "conversationSummaries": [],
+  "preferences": {
+    "favoriteSubjects": [],
+    "learningStyle": "",
+    "bestStudyTime": ""
+  }
+}
