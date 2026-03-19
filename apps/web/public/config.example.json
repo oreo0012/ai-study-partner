@@ -1,0 +1,401 @@
+# AI学伴 配置文件说明
+
+## 概述
+
+AI学伴使用JSON格式的配置文件来管理所有服务设置。配置文件位于 `public/config.json`，应用启动时会自动加载。
+
+## 配置文件结构
+
+```json
+{
+  "llm": { ... },
+  "tts": { ... },
+  "stt": { ... },
+  "character": { ... },
+  "soul": { ... },
+  "live2d": { ... }
+}
+```
+
+---
+
+## 1. LLM (大语言模型) 配置
+
+配置AI对话服务。
+
+```json
+{
+  "llm": {
+    "provider": "openai",
+    "apiKey": "sk-xxx",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "gpt-4o-mini",
+    "temperature": 0.7,
+    "maxTokens": 2048
+  }
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| provider | string | 是 | 服务提供商，支持 `openai`、`minimax` 或其他兼容OpenAI API的服务 |
+| apiKey | string | 是 | API密钥 |
+| baseUrl | string | 是 | API基础URL |
+| model | string | 是 | 模型名称，如 `gpt-4o-mini`、`MiniMax-M2.5` |
+| temperature | number | 否 | 温度参数(0-2)，控制回复随机性，默认0.7 |
+| maxTokens | number | 否 | 最大生成token数，默认2048 |
+
+### 常用LLM服务配置示例
+
+#### OpenAI
+```json
+{
+  "provider": "openai",
+  "apiKey": "sk-xxx",
+  "baseUrl": "https://api.openai.com/v1/",
+  "model": "gpt-4o-mini"
+}
+```
+
+#### MiniMax
+```json
+{
+  "provider": "minimax",
+  "apiKey": "sk-xxx",
+  "baseUrl": "https://api.minimaxi.com/v1/",
+  "model": "MiniMax-M2.5"
+}
+```
+
+#### 本地部署 (Ollama)
+```json
+{
+  "provider": "openai",
+  "apiKey": "ollama",
+  "baseUrl": "http://localhost:11434/v1/",
+  "model": "llama3"
+}
+```
+
+---
+
+## 2. TTS (文字转语音) 配置
+
+配置语音合成服务。
+
+### 2.1 OpenAI TTS
+
+```json
+{
+  "tts": {
+    "provider": "openai",
+    "apiKey": "sk-xxx",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "tts-1",
+    "voice": "nova",
+    "speed": 1.0
+  }
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| provider | string | 是 | 服务提供商 |
+| apiKey | string | 是 | API密钥 |
+| baseUrl | string | 是 | API基础URL |
+| model | string | 是 | TTS模型，如 `tts-1`、`tts-1-hd` |
+| voice | string | 是 | 语音类型 |
+| speed | number | 否 | 语速(0.25-4.0)，默认1.0 |
+
+### OpenAI语音选项
+
+| 语音 | 特点 |
+|------|------|
+| alloy | 中性、平衡 |
+| echo | 男性、温暖 |
+| fable | 英式、讲故事风格 |
+| onyx | 深沉男性 |
+| nova | 女性、友好 |
+| shimmer | 女性、柔和 |
+
+### 2.2 火山引擎 TTS (推荐)
+
+火山引擎提供高质量的中文语音合成服务，支持seed-tts-2.0模型。
+
+```json
+{
+  "tts": {
+    "provider": "volcengine",
+    "appId": "your-app-id",
+    "apiKey": "your-access-key",
+    "resourceId": "seed-tts-2.0",
+    "baseUrl": "/api/volcengine/unidirectional",
+    "model": "seed-tts-2.0-expressive",
+    "voice": "zh_female_tianmei"
+  }
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| provider | string | 是 | 固定为 `volcengine` |
+| appId | string | 是 | 火山引擎控制台获取的APP ID |
+| apiKey | string | 是 | 火山引擎控制台获取的Access Token |
+| resourceId | string | 是 | 资源ID，使用 `seed-tts-2.0` |
+| baseUrl | string | 是 | API端点，使用 `/api/volcengine/unidirectional` |
+| model | string | 否 | 模型版本，默认 `seed-tts-2.0-expressive` |
+| voice | string | 是 | 音色ID |
+
+#### 火山引擎模型选项
+
+| 模型 | 说明 |
+|------|------|
+| seed-tts-2.0-expressive | 表现力强，支持情感表达（推荐） |
+| seed-tts-2.0-standard | 稳定输出，不支持情感表达 |
+
+#### 获取火山引擎凭证
+
+1. 访问 [火山引擎控制台](https://console.volcengine.com/)
+2. 创建语音合成应用
+3. 获取 APP ID 和 Access Token
+4. 选择合适的音色ID
+
+#### 常用音色ID
+
+| 音色ID | 说明 |
+|--------|------|
+| zh_female_tianmei | 中文女声-甜美 |
+| zh_male_chunhou | 中文男声-醇厚 |
+| 其他音色 | 请参考火山引擎官方文档 |
+
+---
+
+## 3. STT (语音转文字) 配置
+
+配置语音识别服务。
+
+```json
+{
+  "stt": {
+    "provider": "openai",
+    "apiKey": "sk-xxx",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "whisper-1",
+    "language": "zh-CN"
+  }
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| provider | string | 是 | 服务提供商 |
+| apiKey | string | 是 | API密钥 |
+| baseUrl | string | 是 | API基础URL |
+| model | string | 是 | STT模型，通常为 `whisper-1` |
+| language | string | 否 | 语言代码，如 `zh-CN`、`en-US` |
+
+### 常用语言代码
+
+| 代码 | 语言 |
+|------|------|
+| zh-CN | 简体中文 |
+| zh-TW | 繁体中文 |
+| en-US | 美式英语 |
+| ja | 日语 |
+| ko | 韩语 |
+
+---
+
+## 4. Character (角色) 配置
+
+配置AI角色的基本信息。
+
+```json
+{
+  "character": {
+    "name": "小伴",
+    "personality": "活泼、耐心、鼓励"
+  }
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | string | 是 | 角色名称，显示在界面标题栏 |
+| personality | string | 否 | 性格描述（参考用） |
+
+**注意**: 系统提示词已迁移到独立的 `soul.md` 文件中，便于编辑和维护。
+
+---
+
+## 5. Soul (灵魂) 配置
+
+配置AI角色的系统提示词文件。
+
+```json
+{
+  "soul": {
+    "path": "/soul.md",
+    "enabled": true
+  }
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| path | string | 是 | soul.md文件的路径，默认 `/soul.md` |
+| enabled | boolean | 否 | 是否启用soul.md，默认true |
+
+### soul.md 文件说明
+
+`soul.md` 是一个Markdown格式的文件，用于定义AI角色的：
+- 角色信息（名称、性格）
+- 行为规则
+- 输出规范
+- 交互风格
+
+**文件位置**: `public/soul.md`
+
+**优势**:
+- 与代码分离，便于非技术人员编辑
+- 支持Markdown格式，可读性强
+- 可独立更新，无需修改配置文件
+
+---
+
+## 6. Live2D 配置
+
+配置虚拟角色动画。
+
+```json
+{
+  "live2d": {
+    "modelPath": "/assets/live2d/hiyori_free_zh/runtime/hiyori_free_t08.model3.json",
+    "scale": 1.0,
+    "positionX": 0,
+    "positionY": 0
+  }
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| modelPath | string | 是 | 模型配置文件路径 |
+| scale | number | 否 | 缩放比例(0.5-2)，默认1.0 |
+| positionX | number | 否 | X轴偏移量，默认0 |
+| positionY | number | 否 | Y轴偏移量，默认0 |
+
+---
+
+## 完整配置示例
+
+### 使用OpenAI服务
+
+```json
+{
+  "llm": {
+    "provider": "openai",
+    "apiKey": "sk-your-api-key",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "gpt-4o-mini",
+    "temperature": 0.7,
+    "maxTokens": 2048
+  },
+  "tts": {
+    "provider": "openai",
+    "apiKey": "sk-your-api-key",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "tts-1",
+    "voice": "nova",
+    "speed": 1.0
+  },
+  "stt": {
+    "provider": "openai",
+    "apiKey": "sk-your-api-key",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "whisper-1",
+    "language": "zh-CN"
+  },
+  "character": {
+    "name": "小伴",
+    "personality": "活泼、耐心、鼓励"
+  },
+  "soul": {
+    "path": "/soul.md",
+    "enabled": true
+  },
+  "live2d": {
+    "modelPath": "/assets/live2d/hiyori_free_zh/runtime/hiyori_free_t08.model3.json",
+    "scale": 1.0,
+    "positionX": 0,
+    "positionY": 0
+  }
+}
+```
+
+### 使用火山引擎TTS（推荐中文用户）
+
+```json
+{
+  "llm": {
+    "provider": "minimax",
+    "apiKey": "sk-your-minimax-key",
+    "baseUrl": "https://api.minimaxi.com/v1/",
+    "model": "MiniMax-M2.5",
+    "temperature": 0.7,
+    "maxTokens": 2048
+  },
+  "tts": {
+    "provider": "volcengine",
+    "appId": "your-app-id",
+    "apiKey": "your-access-key",
+    "resourceId": "seed-tts-2.0",
+    "baseUrl": "/api/volcengine/unidirectional",
+    "model": "seed-tts-2.0-expressive",
+    "voice": "zh_female_tianmei"
+  },
+  "stt": {
+    "provider": "openai",
+    "apiKey": "sk-your-api-key",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "whisper-1",
+    "language": "zh-CN"
+  },
+  "character": {
+    "name": "小伴",
+    "personality": "活泼、耐心、鼓励"
+  },
+  "soul": {
+    "path": "/soul.md",
+    "enabled": true
+  },
+  "live2d": {
+    "modelPath": "/assets/live2d/hiyori_free_zh/runtime/hiyori_free_t08.model3.json",
+    "scale": 1.0,
+    "positionX": 0,
+    "positionY": 0
+  }
+}
+```
+
+---
+
+## 常见问题
+
+### Q: 配置文件修改后需要重启应用吗？
+A: 是的，配置文件在应用启动时加载，修改后需要刷新页面。
+
+### Q: API密钥安全吗？
+A: API密钥存储在前端配置文件中，仅适用于本地或受信任环境部署。生产环境建议使用后端代理。
+
+### Q: 支持哪些LLM服务？
+A: 支持所有兼容OpenAI API格式的服务，包括OpenAI、MiniMax、智谱AI、本地Ollama等。
+
+### Q: 如何修改AI的性格和行为？
+A: 编辑 `public/soul.md` 文件，该文件定义了AI的角色设定、行为规则和输出规范。
+
+### Q: 如何使用不同的Live2D模型？
+A: 将模型文件放入 `public/assets/live2d/` 目录，然后修改配置中的 `modelPath` 指向新的模型配置文件。
+
+### Q: 为什么AI输出中会包含思考过程？
+A: 系统已内置思考过程过滤器，会自动过滤 `<think`、`<thinking` 等标签。如果仍有问题，请检查 `soul.md` 中的行为规则是否正确配置。

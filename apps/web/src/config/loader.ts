@@ -1,13 +1,26 @@
 import type { AppConfig } from './types'
 import { validateConfig } from './validator'
+import { loadSoul, type SoulLoadResult } from '@/services/soul'
 
 const CONFIG_URL = '/config.json'
+const DEFAULT_SOUL_PATH = '/soul.md'
 
 let cachedConfig: AppConfig | null = null
+let cachedSoulContent: string | null = null
 
-export async function loadConfig(): Promise<AppConfig> {
-  if (cachedConfig) {
-    return cachedConfig
+export interface ConfigLoadResult {
+  config: AppConfig
+  soulContent: string
+  soulSource: 'file' | 'default' | 'fallback'
+}
+
+export async function loadConfig(): Promise<ConfigLoadResult> {
+  if (cachedConfig && cachedSoulContent) {
+    return {
+      config: cachedConfig,
+      soulContent: cachedSoulContent,
+      soulSource: 'file'
+    }
   }
 
   try {
@@ -28,7 +41,28 @@ export async function loadConfig(): Promise<AppConfig> {
     }
 
     cachedConfig = config
-    return config
+    
+    const soulPath = config.soul?.path ?? DEFAULT_SOUL_PATH
+    const soulEnabled = config.soul?.enabled ?? true
+    
+    let soulResult: SoulLoadResult
+    
+    if (soulEnabled) {
+      soulResult = await loadSoul({ path: soulPath })
+    } else {
+      soulResult = {
+        content: config.character?.systemPrompt || '',
+        source: 'fallback'
+      }
+    }
+    
+    cachedSoulContent = soulResult.content
+
+    return {
+      config,
+      soulContent: soulResult.content,
+      soulSource: soulResult.source
+    }
   } catch (error) {
     console.error('Failed to load config:', error)
     throw error
@@ -39,6 +73,11 @@ export function getConfig(): AppConfig | null {
   return cachedConfig
 }
 
+export function getSoulContent(): string | null {
+  return cachedSoulContent
+}
+
 export function clearConfigCache(): void {
   cachedConfig = null
+  cachedSoulContent = null
 }

@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "cd apps/web && vite",
     "build": "cd apps/web && vite build",
-    "preview": "cd apps/web && vite preview"
+    "preview": "cd apps/web && vite preview",
+    "typecheck": "cd apps/web && vue-tsc --noEmit"
   },
   "devDependencies": {
     "vite": "^6.0.5",

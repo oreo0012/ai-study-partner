@@ -69,10 +69,10 @@
   - [x] SubTask 11.3: 创建加载动画组件（已集成）
   - [x] SubTask 11.4: 创建错误提示组件（已集成）
 
-- [ ] Task 12: 实现表情动画同步（待完善）
-  - [ ] SubTask 12.1: 定义情感-表情映射
-  - [ ] SubTask 12.2: 实现LLM输出情感解析
-  - [ ] SubTask 12.3: 实现表情切换动画
+- [x] Task 12: 实现表情动画同步
+  - [x] SubTask 12.1: 定义情感-表情映射
+  - [x] SubTask 12.2: 实现LLM输出情感解析
+  - [x] SubTask 12.3: 实现表情切换动画
 
 ## Phase 5: 测试与优化
 
@@ -83,15 +83,15 @@
   - [x] SubTask 13.4: 测试STT语音输入
   - [x] SubTask 13.5: 测试Live2D动画
 
-- [ ] Task 14: 性能优化（后续迭代）
-  - [ ] SubTask 14.1: 优化Live2D模型加载性能
-  - [ ] SubTask 14.2: 优化音频流处理
-  - [ ] SubTask 14.3: 优化响应式布局性能
+- [x] Task 14: 性能优化
+  - [x] SubTask 14.1: 优化Live2D模型加载性能（已实现缓存机制）
+  - [x] SubTask 14.2: 优化音频流处理（已实现LipSyncAnalyzer）
+  - [x] SubTask 14.3: 优化响应式布局性能
 
-- [ ] Task 15: 文档与部署（后续迭代）
-  - [ ] SubTask 15.1: 编写配置文件说明文档
-  - [ ] SubTask 15.2: 编写部署指南
-  - [ ] SubTask 15.3: 创建示例配置文件
+- [x] Task 15: 文档与部署
+  - [x] SubTask 15.1: 编写配置文件说明文档
+  - [x] SubTask 15.2: 编写部署指南
+  - [x] SubTask 15.3: 创建示例配置文件
 
 # Task Dependencies
 

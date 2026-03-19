@@ -1,24 +1,26 @@
 import type { Message } from '@/services/types'
+import { ThinkFilter, filterThinkTags } from './think-filter'
 
 export interface StreamOptions {
   onToken?: (token: string) => void
   onComplete?: (fullText: string) => void
   onError?: (error: Error) => void
   signal?: AbortSignal
+  enableThinkFilter?: boolean
 }
 
 export interface ChatOptions {
   model: string
   provider: { chat: (model: string) => { baseURL: string; apiKey: string; headers?: Record<string, string> } }
   systemPrompt?: string
-  messages: Message[]
+  messages: Array<{ role: string; content: string }>
   temperature?: number
   maxTokens?: number
 }
 
 export async function streamChat(options: ChatOptions, streamOptions: StreamOptions = {}): Promise<string> {
   const { model, provider, systemPrompt, messages, temperature, maxTokens } = options
-  const { onToken, onComplete, onError, signal } = streamOptions
+  const { onToken, onComplete, onError, signal, enableThinkFilter = true } = streamOptions
 
   const chatConfig = provider.chat(model)
   
@@ -35,6 +37,8 @@ export async function streamChat(options: ChatOptions, streamOptions: StreamOpti
     })
   }
 
+  const thinkFilter = new ThinkFilter({ enableStreamFilter: true })
+
   try {
     const response = await fetch(`${chatConfig.baseURL}chat/completions`, {
       method: 'POST',
@@ -46,7 +50,7 @@ export async function streamChat(options: ChatOptions, streamOptions: StreamOpti
       body: JSON.stringify({
         model,
         messages: apiMessages,
-        temperature: temperature ?? 0.7,
+        temperature: temperature ?? 0.0,
         max_tokens: maxTokens,
         stream: true
       }),
@@ -83,7 +87,15 @@ export async function streamChat(options: ChatOptions, streamOptions: StreamOpti
             const content = parsed.choices?.[0]?.delta?.content
             if (content) {
               fullText += content
-              onToken?.(content)
+              
+              if (enableThinkFilter) {
+                const filteredContent = thinkFilter.filterStream(content)
+                if (filteredContent) {
+                  onToken?.(filteredContent)
+                }
+              } else {
+                onToken?.(content)
+              }
             }
           } catch {
             // ignore parse errors
@@ -92,8 +104,12 @@ export async function streamChat(options: ChatOptions, streamOptions: StreamOpti
       }
     }
 
-    onComplete?.(fullText)
-    return fullText
+    const finalFilteredText = enableThinkFilter 
+      ? thinkFilter.finalize(fullText)
+      : filterThinkTags(fullText)
+    
+    onComplete?.(finalFilteredText)
+    return finalFilteredText
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error))
     onError?.(err)

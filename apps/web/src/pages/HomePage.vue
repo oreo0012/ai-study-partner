@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import type { EmotionType } from '@/services/emotion'
+import type { LipSyncResult } from '@/services/lipsync'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useConfigStore, useChatStore, useLive2dStore } from '@/stores'
 import { Live2DStage, ChatArea } from '@/components'
+import { useLipSync } from '@/composables/useLipSync'
 
 const configStore = useConfigStore()
 const chatStore = useChatStore()
 const live2dStore = useLive2dStore()
+const { updateLipSync, resetLipSync } = useLipSync()
 
 const isLoading = ref(true)
 const loadError = ref<string | null>(null)
@@ -19,12 +23,22 @@ onMounted(async () => {
       live2dStore.setScale(configStore.live2dConfig.scale)
       live2dStore.setPosition(configStore.live2dConfig.positionX, configStore.live2dConfig.positionY)
     }
+    
+    chatStore.setEmotionCallback(handleEmotionChange)
+    chatStore.setTTSCallback(handleLipSync)
+    chatStore.initTTSService()
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '加载配置失败'
     console.error('Failed to load config:', error)
   } finally {
     isLoading.value = false
   }
+})
+
+onUnmounted(() => {
+  chatStore.setEmotionCallback(null)
+  chatStore.setTTSCallback(null)
+  resetLipSync()
 })
 
 function handleLive2DLoaded() {
@@ -34,6 +48,25 @@ function handleLive2DLoaded() {
 function handleLive2DError(error: Error) {
   console.error('Live2D load error:', error)
 }
+
+function handleEmotionChange(emotion: EmotionType, intensity: number) {
+  if (live2dRef.value && live2dRef.value.isLoaded) {
+    live2dRef.value.setExpressionByEmotion(emotion, intensity)
+  }
+}
+
+function handleLipSync(result: LipSyncResult) {
+  updateLipSync(result)
+  if (live2dRef.value && live2dRef.value.isLoaded) {
+    live2dRef.value.setMouthOpenY(result.mouthOpenY)
+  }
+}
+
+watch(() => chatStore.currentEmotion, (newEmotion) => {
+  if (live2dRef.value && live2dRef.value.isLoaded) {
+    live2dRef.value.setExpressionByEmotion(newEmotion, 1.0)
+  }
+})
 </script>
 
 <template>
