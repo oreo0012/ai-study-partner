@@ -90,7 +90,7 @@ const handleTaskSubmit = async (formData: {
     type: formData.type,
     estimatedTime: formData.estimatedTime,
     date: formData.date,
-    status: '待完成'
+    status: '未完成'
   })
   
   if (newTask) {
@@ -118,6 +118,17 @@ const handleTaskSave = async (taskId: string, formData: {
 }
 
 const handleTaskDelete = async (taskId: string) => {
+  const task = taskStore.tasks.find(t => t.id === taskId)
+  
+  if (task && task.exerciseIds && task.exerciseIds.length > 0) {
+    const { deleteExercises } = await import('@/services/data-service')
+    const success = await deleteExercises(task.exerciseIds)
+    if (!success) {
+      console.error('Failed to delete associated exercises')
+      return
+    }
+  }
+  
   const success = await taskStore.removeTask(taskId)
   if (success) {
     await taskStore.loadAllTasks()
@@ -153,17 +164,28 @@ const handleExerciseUpload = async (result: { exercises: ParsedExercise[]; filen
       const today = new Date().toISOString().split('T')[0]
       const taskName = `完成习题: ${result.filename.replace(/\.[^/.]+$/, '')}`
       
+      const exerciseIds = savedExercises.map(ex => ex.id)
+      
       await taskStore.createTask({
         name: taskName,
         description: `共 ${savedExercises.length} 道题目，包括选择题、填空题和简答题`,
         type: '练习',
         estimatedTime: Math.ceil(savedExercises.length * 3),
         date: today,
-        status: '待完成'
+        status: '未完成',
+        exerciseIds
       })
       
       uploadSuccess.value = true
       uploadMessage.value = `成功上传 ${savedExercises.length} 道习题，已自动关联到今日待办事项`
+      
+      setTimeout(() => {
+        uploadSuccess.value = false
+        uploadMessage.value = ''
+      }, 5000)
+    } else {
+      uploadSuccess.value = true
+      uploadMessage.value = `这 ${result.exercises.length} 道习题已存在，无需重复上传`
       
       setTimeout(() => {
         uploadSuccess.value = false

@@ -55,7 +55,7 @@ export interface AppConfig {
 }
 
 export type TaskType = '学习' | '练习' | '阅读' | '其他'
-export type TaskStatus = '待完成' | '进行中' | '已完成'
+export type TaskStatus = '未完成' | '已完成'
 
 export interface Task {
   id: string
@@ -67,6 +67,7 @@ export interface Task {
   status: TaskStatus
   createdAt: string
   completedAt?: string
+  exerciseIds?: string[]
 }
 
 export interface TasksData {
@@ -74,7 +75,7 @@ export interface TasksData {
   lastUpdated: string
 }
 
-export type ExerciseType = '选择题' | '填空题' | '简答题'
+export type ExerciseType = '选择题' | '填空题' | '简答题' | '口算题' | '竖式计算题' | '应用题'
 
 export interface Exercise {
   id: string
@@ -84,6 +85,12 @@ export interface Exercise {
   answer: string
   chapter?: string
   subject?: string
+  hash?: string
+  createdAt?: string
+  completedAt?: string
+  status?: 'pending' | 'completed' | 'archived'
+  userAnswer?: string
+  isCorrect?: boolean
 }
 
 export interface ExercisesData {
@@ -92,11 +99,19 @@ export interface ExercisesData {
 }
 
 export interface ExerciseRecord {
-  date: string
+  exerciseId?: string
+  type?: ExerciseType
+  question?: string
+  userAnswer?: string
+  correctAnswer?: string
+  isCorrect?: boolean
+  completedAt?: string
+  status?: 'completed' | 'expired'
+  date?: string
   subject?: string
-  score: number
-  total: number
-  weakPoints: string[]
+  score?: number
+  total?: number
+  weakPoints?: string[]
 }
 
 export interface ConversationSummary {
