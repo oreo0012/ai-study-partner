@@ -13,16 +13,18 @@ export interface ParseResult {
   success: boolean
   exercises: ParsedExercise[]
   errors: string[]
+  warnings: string[]
   stats: {
     total: number
     byType: Record<ExerciseType, number>
   }
 }
 
-const CHAPTER_PATTERNS = [
-  /^#+\s*(.+)$/m,
-  /^第[一二三四五六七八九十\d]+[章节部]\s*(.*)$/m,
-  /^Chapter\s*\d+[:\s]*(.*)$/im
+const SECTION_TITLE_PATTERNS = [
+  /^[一二三四五六七八九十]+[、\.．]\s*(.+)$/,
+  /^第[一二三四五六七八九十\d]+[章节部]\s*(.*)$/,
+  /^#+\s*(.+)$/,
+  /^Chapter\s*\d+[:\s]*(.*)$/i
 ]
 
 const QUESTION_NUMBER_PATTERNS = [
@@ -32,9 +34,12 @@ const QUESTION_NUMBER_PATTERNS = [
 ]
 
 const EXERCISE_TYPE_KEYWORDS: Record<ExerciseType, string[]> = {
-  '选择题': ['选择题', '单选题', '多选题', '单项选择', '多项选择'],
-  '填空题': ['填空题', '填空', '完成句子'],
-  '简答题': ['简答题', '简答', '问答题', '论述题', '解答题', '主观题']
+  '选择题': ['选择题', '单选题', '多选题', '单项选择', '多项选择', '一、选择题', '二、选择题', '三、选择题', '四、选择题'],
+  '填空题': ['填空题', '填空', '完成句子', '一、填空题', '二、填空题', '三、填空题', '四、填空题'],
+  '简答题': ['简答题', '简答', '问答题', '论述题', '解答题', '主观题', '一、简答题', '二、简答题', '三、简答题', '四、简答题'],
+  '口算题': ['口算题', '口算', '一、口算题', '二、口算题', '三、口算题', '四、口算题'],
+  '竖式计算题': ['竖式计算题', '竖式计算', '竖式题', '一、竖式计算题', '二、竖式计算题', '三、竖式计算题', '四、竖式计算题'],
+  '应用题': ['应用题', '应用', '一、应用题', '二、应用题', '三、应用题', '四、应用题']
 }
 
 const ANSWER_PATTERNS = [
@@ -46,12 +51,17 @@ const ANSWER_PATTERNS = [
 
 const OPTION_PATTERN = /^([A-Fa-f])\s*[\.、．]\s*(.+)$/
 
+const CHINESE_NUM_MAP: Record<string, number> = {
+  '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+  '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+}
+
 function detectExerciseType(text: string): ExerciseType | null {
-  const lowerText = text.toLowerCase()
+  const trimmedText = text.trim()
   
   for (const [type, keywords] of Object.entries(EXERCISE_TYPE_KEYWORDS)) {
     for (const keyword of keywords) {
-      if (lowerText.includes(keyword.toLowerCase())) {
+      if (trimmedText.includes(keyword) || trimmedText === keyword) {
         return type as ExerciseType
       }
     }
@@ -60,30 +70,35 @@ function detectExerciseType(text: string): ExerciseType | null {
   return null
 }
 
-function extractChapter(lines: string[], startIndex: number): string | undefined {
-  for (let i = startIndex; i >= 0; i--) {
-    const line = lines[i].trim()
-    for (const pattern of CHAPTER_PATTERNS) {
-      const match = line.match(pattern)
-      if (match) {
-        return match[1] ? match[1].trim() : line
-      }
+function isSectionTitle(line: string): boolean {
+  const trimmedLine = line.trim()
+  for (const pattern of SECTION_TITLE_PATTERNS) {
+    if (pattern.test(trimmedLine)) {
+      return true
     }
   }
-  return undefined
+  return false
+}
+
+function extractSectionTitle(line: string): string | null {
+  const trimmedLine = line.trim()
+  for (const pattern of SECTION_TITLE_PATTERNS) {
+    const match = trimmedLine.match(pattern)
+    if (match) {
+      return match[1] ? match[1].trim() : trimmedLine
+    }
+  }
+  return null
 }
 
 function parseQuestionNumber(line: string): number | null {
+  const trimmedLine = line.trim()
   for (const pattern of QUESTION_NUMBER_PATTERNS) {
-    const match = line.match(pattern)
+    const match = trimmedLine.match(pattern)
     if (match) {
       const numStr = match[1]
       if (/^[一二三四五六七八九十]+$/.test(numStr)) {
-        const chineseNums: Record<string, number> = {
-          '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-          '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
-        }
-        return chineseNums[numStr] || null
+        return CHINESE_NUM_MAP[numStr] || null
       }
       return parseInt(numStr, 10)
     }
@@ -115,7 +130,8 @@ function parseOptions(lines: string[], startIndex: number): { options: string[];
       currentIndex++
     } else if (parseQuestionNumber(line) !== null || 
                ANSWER_PATTERNS.some(p => p.test(line)) ||
-               detectExerciseType(line)) {
+               detectExerciseType(line) ||
+               isSectionTitle(line)) {
       break
     } else {
       currentIndex++
@@ -143,39 +159,16 @@ function cleanQuestionText(text: string): string {
     .trim()
 }
 
-function parseExercisesFromContent(content: string): ParsedExercise[] {
+function parseExercisesFromContent(content: string, errors: string[], warnings: string[]): ParsedExercise[] {
   const exercises: ParsedExercise[] = []
   const lines = content.split('\n')
   
   let currentType: ExerciseType | null = null
   let currentChapter: string | undefined = undefined
-  let currentQuestion: string | null = null
-  let currentOptions: string[] = []
-  let currentAnswer: string | null = null
-  let questionStartIndex = -1
-  
-  function saveCurrentExercise() {
-    if (currentQuestion && currentQuestion.trim()) {
-      const exercise: ParsedExercise = {
-        type: currentType || '简答题',
-        question: cleanQuestionText(currentQuestion),
-        answer: currentAnswer || '',
-        chapter: currentChapter
-      }
-      
-      if (currentType === '选择题' && currentOptions.length > 0) {
-        exercise.options = currentOptions
-      }
-      
-      exercises.push(exercise)
-    }
-    
-    currentQuestion = null
-    currentOptions = []
-    currentAnswer = null
-  }
+  let lineNumber = 0
   
   for (let i = 0; i < lines.length; i++) {
+    lineNumber++
     const line = lines[i].trim()
     
     if (!line) {
@@ -184,101 +177,146 @@ function parseExercisesFromContent(content: string): ParsedExercise[] {
     
     const detectedType = detectExerciseType(line)
     if (detectedType) {
-      saveCurrentExercise()
       currentType = detectedType
+      console.log(`[解析] 第${lineNumber}行: 检测到题型 "${detectedType}"`)
       continue
     }
     
-    const chapterMatch = CHAPTER_PATTERNS.some(p => p.test(line))
-    if (chapterMatch && !parseQuestionNumber(line)) {
-      currentChapter = line.replace(/^#+\s*/, '').trim()
-      continue
-    }
-    
-    const answerText = extractAnswer(line)
-    if (answerText !== null) {
-      currentAnswer = answerText
+    if (isSectionTitle(line)) {
+      const title = extractSectionTitle(line)
+      if (title && !detectExerciseType(title)) {
+        currentChapter = title
+        console.log(`[解析] 第${lineNumber}行: 检测到章节 "${title}"`)
+      }
       continue
     }
     
     const questionNum = parseQuestionNumber(line)
     if (questionNum !== null) {
-      saveCurrentExercise()
-      currentQuestion = line
-      questionStartIndex = i
+      const questionText = cleanQuestionText(line)
+      
+      if (!questionText) {
+        warnings.push(`第${lineNumber}行: 题目编号 ${questionNum} 但内容为空`)
+        continue
+      }
+      
+      const exercise: ParsedExercise = {
+        type: currentType || '简答题',
+        question: questionText,
+        answer: '',
+        chapter: currentChapter
+      }
       
       if (currentType === '选择题') {
         const { options, endIndex } = parseOptions(lines, i + 1)
-        currentOptions = options
-        i = endIndex - 1
+        if (options.length > 0) {
+          exercise.options = options
+          i = endIndex - 1
+        } else {
+          warnings.push(`第${lineNumber}行: 选择题 "${questionText.substring(0, 20)}..." 缺少选项`)
+        }
       }
       
-      continue
-    }
-    
-    if (currentType === '选择题' && OPTION_PATTERN.test(line)) {
-      const optionMatch = line.match(OPTION_PATTERN)
-      if (optionMatch) {
-        const optionLetter = optionMatch[1].toUpperCase()
-        const optionContent = optionMatch[2].trim()
-        const optionIndex = optionLetter.charCodeAt(0) - 65
-        
-        while (currentOptions.length <= optionIndex) {
-          currentOptions.push('')
+      let j = i + 1
+      while (j < lines.length) {
+        const nextLine = lines[j].trim()
+        if (!nextLine) {
+          j++
+          continue
         }
-        currentOptions[optionIndex] = optionContent
+        
+        if (parseQuestionNumber(nextLine) !== null || 
+            detectExerciseType(nextLine) || 
+            isSectionTitle(nextLine)) {
+          break
+        }
+        
+        const answerText = extractAnswer(nextLine)
+        if (answerText !== null) {
+          exercise.answer = answerText
+          i = j
+          break
+        }
+        
+        if (currentType === '选择题' && OPTION_PATTERN.test(nextLine)) {
+          break
+        }
+        
+        exercise.question += '\n' + nextLine
+        j++
       }
-      continue
-    }
-    
-    if (currentQuestion && !currentAnswer) {
-      currentQuestion += '\n' + line
+      
+      exercises.push(exercise)
+      console.log(`[解析] 第${lineNumber}行: 成功解析题目 "${questionText.substring(0, 30)}..."`)
     }
   }
-  
-  saveCurrentExercise()
   
   return exercises
 }
 
 export function parseExerciseDocument(content: string, filename: string): ParseResult {
   const errors: string[] = []
+  const warnings: string[] = []
+  
+  console.log(`[解析] 开始解析文件: ${filename}`)
+  console.log(`[解析] 文件内容长度: ${content.length} 字符`)
   
   if (!content || !content.trim()) {
+    errors.push('文件内容为空')
     return {
       success: false,
       exercises: [],
-      errors: ['文件内容为空'],
-      stats: { total: 0, byType: { '选择题': 0, '填空题': 0, '简答题': 0 } }
+      errors,
+      warnings,
+      stats: { 
+        total: 0, 
+        byType: { 
+          '选择题': 0, 
+          '填空题': 0, 
+          '简答题': 0,
+          '口算题': 0,
+          '竖式计算题': 0,
+          '应用题': 0
+        } 
+      }
     }
   }
   
   try {
-    const exercises = parseExercisesFromContent(content)
+    const exercises = parseExercisesFromContent(content, errors, warnings)
     
     if (exercises.length === 0) {
       errors.push('未能识别到有效的习题，请检查文件格式')
+      errors.push('提示: 确保题目使用数字编号（如 1. 2. 3.）或中文编号（如 一、二、三、）')
     }
     
     const stats: { total: number; byType: Record<ExerciseType, number> } = {
       total: exercises.length,
-      byType: { '选择题': 0, '填空题': 0, '简答题': 0 }
+      byType: { 
+        '选择题': 0, 
+        '填空题': 0, 
+        '简答题': 0,
+        '口算题': 0,
+        '竖式计算题': 0,
+        '应用题': 0
+      }
     }
     
-    exercises.forEach(ex => {
-      stats.byType[ex.type]++
-    })
+    const validExercises: ParsedExercise[] = []
     
-    const validExercises = exercises.filter(ex => {
-      if (!ex.question) {
-        errors.push(`发现空题目，已跳过`)
-        return false
+    exercises.forEach((ex, index) => {
+      if (!ex.question || !ex.question.trim()) {
+        errors.push(`第${index + 1}题: 题目内容为空，已跳过`)
+        return
       }
+      
       if (ex.type === '选择题' && (!ex.options || ex.options.length === 0)) {
-        errors.push(`选择题缺少选项: ${ex.question.substring(0, 30)}...`)
+        warnings.push(`第${index + 1}题: 选择题缺少选项，已转为简答题`)
         ex.type = '简答题'
       }
-      return true
+      
+      stats.byType[ex.type]++
+      validExercises.push(ex)
     })
     
     const subject = filename.includes('数学') ? '数学' :
@@ -292,18 +330,45 @@ export function parseExerciseDocument(content: string, filename: string): ParseR
       ex.subject = subject
     })
     
+    console.log(`[解析] 解析完成: 共 ${validExercises.length} 道题目`)
+    console.log(`[解析] 题型分布:`, stats.byType)
+    
+    if (warnings.length > 0) {
+      console.log(`[解析] 警告:`, warnings)
+    }
+    
+    if (errors.length > 0) {
+      console.log(`[解析] 错误:`, errors)
+    }
+    
     return {
       success: validExercises.length > 0,
       exercises: validExercises,
       errors,
+      warnings,
       stats
     }
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : '未知错误'
+    errors.push(`解析过程出错: ${errorMsg}`)
+    console.error(`[解析] 解析失败:`, error)
+    
     return {
       success: false,
       exercises: [],
-      errors: [`解析过程出错: ${error instanceof Error ? error.message : '未知错误'}`],
-      stats: { total: 0, byType: { '选择题': 0, '填空题': 0, '简答题': 0 } }
+      errors,
+      warnings,
+      stats: { 
+        total: 0, 
+        byType: { 
+          '选择题': 0, 
+          '填空题': 0, 
+          '简答题': 0,
+          '口算题': 0,
+          '竖式计算题': 0,
+          '应用题': 0
+        } 
+      }
     }
   }
 }
@@ -331,10 +396,29 @@ D. 4
 2. 一年有______个月。
 答案：12
 
-三、简答题
-1. 请简述光合作用的过程。
-答案：光合作用是植物利用阳光能量，将二氧化碳和水转化为葡萄糖和氧气的过程。
+三、口算题
+1. 49 ÷ 7 =
+答案：7
 
-2. 为什么要保护环境？
-答案：保护环境可以维护生态平衡，保障人类健康，实现可持续发展。`
+2. 36 ÷ 6 =
+答案：6
+
+四、竖式计算题
+1. 41 + 18 - 26 =
+答案：33
+
+五、应用题
+1. 小明有5个苹果，给了小红2个，还剩几个？
+答案：5 - 2 = 3（个）`
+}
+
+export function generateExerciseHash(exercise: { type: string; question: string; answer?: string }): string {
+  const content = `${exercise.type}|${exercise.question}|${exercise.answer || ''}`
+  let hash = 0
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(36)
 }
