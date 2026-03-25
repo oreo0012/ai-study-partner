@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import type { Task, TaskStatus } from '@/config/types'
 
 const props = defineProps<{
@@ -14,14 +14,16 @@ const emit = defineEmits<{
 }>()
 
 const statusFilter = ref<TaskStatus | '全部'>('全部')
-const dateFilter = ref<string>('全部')
+const dateFilter = ref<string>('今日')
+
+const getTodayDate = () => new Date().toISOString().split('T')[0]
 
 const availableDates = computed(() => {
   const dates = new Set<string>()
   props.tasks.forEach(task => {
     dates.add(task.date)
   })
-  return Array.from(dates).sort()
+  return Array.from(dates).sort().reverse()
 })
 
 const filteredTasks = computed(() => {
@@ -31,14 +33,17 @@ const filteredTasks = computed(() => {
     result = result.filter(task => task.status === statusFilter.value)
   }
   
-  if (dateFilter.value !== '全部') {
+  const today = getTodayDate()
+  if (dateFilter.value === '今日') {
+    result = result.filter(task => task.date === today)
+  } else if (dateFilter.value !== '全部') {
     result = result.filter(task => task.date === dateFilter.value)
   }
   
   return result.sort((a, b) => {
-    const dateCompare = a.date.localeCompare(b.date)
+    const dateCompare = b.date.localeCompare(a.date)
     if (dateCompare !== 0) return dateCompare
-    return a.createdAt.localeCompare(b.createdAt)
+    return b.createdAt.localeCompare(a.createdAt)
   })
 })
 
@@ -69,10 +74,8 @@ function executeDelete() {
 
 function getStatusClass(status: TaskStatus) {
   switch (status) {
-    case '待完成':
+    case '未完成':
       return 'bg-amber-100 text-amber-700'
-    case '进行中':
-      return 'bg-blue-100 text-blue-700'
     case '已完成':
       return 'bg-green-100 text-green-700'
     default:
@@ -115,8 +118,7 @@ function formatDate(dateStr: string) {
           class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none bg-white"
         >
           <option value="全部">全部状态</option>
-          <option value="待完成">待完成</option>
-          <option value="进行中">进行中</option>
+          <option value="未完成">未完成</option>
           <option value="已完成">已完成</option>
         </select>
       </div>
@@ -127,6 +129,7 @@ function formatDate(dateStr: string) {
           v-model="dateFilter"
           class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none bg-white"
         >
+          <option value="今日">今日</option>
           <option value="全部">全部日期</option>
           <option v-for="date in availableDates" :key="date" :value="date">
             {{ formatDate(date) }} ({{ date }})
