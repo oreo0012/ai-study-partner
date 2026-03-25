@@ -2,21 +2,31 @@
 import { ref, computed } from 'vue'
 import { parseExerciseDocument, getFormatExample, type ParsedExercise } from '@/services/exercise-parser'
 import type { ExerciseType } from '@/config/types'
+import ImageExerciseUploader from './ImageExerciseUploader.vue'
+
+type UploadMode = 'text' | 'image'
 
 interface UploadResult {
   exercises: ParsedExercise[]
   filename: string
 }
 
+interface ImageUploadResult {
+  exercises: any[]
+  imageId: string
+}
+
 const emit = defineEmits<{
   (e: 'upload', result: UploadResult): void
 }>()
 
+const uploadMode = ref<UploadMode>('text')
 const isDragging = ref(false)
 const isUploading = ref(false)
 const selectedFile = ref<File | null>(null)
 const parseResult = ref<ReturnType<typeof parseExerciseDocument> | null>(null)
 const errorMessage = ref<string | null>(null)
+const warningMessage = ref<string | null>(null)
 const showFormatExample = ref(false)
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -49,6 +59,7 @@ function validateFile(file: File): string | null {
 
 async function handleFileSelect(file: File) {
   errorMessage.value = null
+  warningMessage.value = null
   parseResult.value = null
   
   const validationError = validateFile(file)
@@ -65,6 +76,8 @@ async function handleFileSelect(file: File) {
     
     if (!parseResult.value.success) {
       errorMessage.value = parseResult.value.errors.join('\n')
+    } else if (parseResult.value.warnings.length > 0) {
+      warningMessage.value = parseResult.value.warnings.join('\n')
     }
   } catch (error) {
     errorMessage.value = `读取文件失败: ${error instanceof Error ? error.message : '未知错误'}`
@@ -142,17 +155,49 @@ function toggleFormatExample() {
 }
 
 const formatExampleText = getFormatExample()
+
+function handleImageUpload(result: ImageUploadResult) {
+  emit('upload', {
+    exercises: result.exercises,
+    filename: `图片识别_${Date.now()}`
+  })
+}
 </script>
 
 <template>
   <div class="exercise-uploader">
+    <div class="upload-mode-tabs flex gap-2 mb-4">
+      <button
+        class="tab-btn flex-1 py-2 px-4 rounded-lg font-medium transition-colors"
+        :class="uploadMode === 'text' ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+        @click="uploadMode = 'text'"
+      >
+        📝 文本上传
+      </button>
+      <button
+        class="tab-btn flex-1 py-2 px-4 rounded-lg font-medium transition-colors"
+        :class="uploadMode === 'image' ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+        @click="uploadMode = 'image'"
+      >
+        📷 拍照上传
+      </button>
+    </div>
+
+    <div v-if="uploadMode === 'image'">
+      <ImageExerciseUploader
+        @upload="handleImageUpload"
+        @cancel="uploadMode = 'text'"
+      />
+    </div>
+
+    <div v-else class="text-upload-area">
     <div
       class="upload-area border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer"
       :class="[
-        isDragging 
-          ? 'border-indigo-500 bg-indigo-50' 
-          : errorMessage 
-            ? 'border-red-300 bg-red-50' 
+        isDragging
+          ? 'border-indigo-500 bg-indigo-50'
+          : errorMessage
+            ? 'border-red-300 bg-red-50'
             : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50'
       ]"
       @click="triggerFileInput"
@@ -191,6 +236,16 @@ const formatExampleText = getFormatExample()
       </div>
     </div>
     
+    <div v-if="warningMessage" class="warning-message mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+      <div class="flex items-start gap-3">
+        <span class="text-xl">⚠️</span>
+        <div>
+          <p class="text-amber-700 font-medium">解析警告</p>
+          <p class="text-amber-600 text-sm mt-1 whitespace-pre-line">{{ warningMessage }}</p>
+        </div>
+      </div>
+    </div>
+    
     <div v-if="hasValidResult" class="parse-result mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
       <div class="flex items-start gap-3">
         <span class="text-xl">✅</span>
@@ -209,7 +264,10 @@ const formatExampleText = getFormatExample()
               :class="{
                 'bg-blue-100 text-blue-700': type === '选择题',
                 'bg-purple-100 text-purple-700': type === '填空题',
-                'bg-amber-100 text-amber-700': type === '简答题'
+                'bg-amber-100 text-amber-700': type === '简答题',
+                'bg-cyan-100 text-cyan-700': type === '口算题',
+                'bg-orange-100 text-orange-700': type === '竖式计算题',
+                'bg-pink-100 text-pink-700': type === '应用题'
               }"
             >
               {{ type }}: {{ count }}
@@ -273,13 +331,15 @@ const formatExampleText = getFormatExample()
           <pre class="text-xs text-blue-700 bg-blue-100 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{{ formatExampleText }}</pre>
           
           <ul class="text-sm text-blue-600 mt-3 space-y-1">
-            <li>• 题型标识：选择题、填空题、简答题</li>
+            <li>• 题型标识：选择题、填空题、简答题、口算题、竖式计算题、应用题</li>
             <li>• 题目编号：1. 或 一、 或 （1）</li>
             <li>• 选择题选项：A. B. C. D.</li>
             <li>• 答案格式：答案：xxx 或 答：xxx</li>
+            <li>• 支持中文数字标题：一、二、三、四</li>
           </ul>
         </div>
       </Transition>
+    </div>
     </div>
   </div>
 </template>

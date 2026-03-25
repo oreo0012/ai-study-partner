@@ -45,6 +45,15 @@ export interface Live2DConfig {
   positionY: number
 }
 
+export interface VisionConfig {
+  provider: 'siliconflow'
+  apiKey: string
+  baseUrl: string
+  model: string
+  timeout: number
+  maxRetries: number
+}
+
 export interface AppConfig {
   llm: LLMConfig
   tts: TTSConfig
@@ -52,6 +61,7 @@ export interface AppConfig {
   character: CharacterConfig
   live2d?: Live2DConfig
   soul?: SoulConfig
+  vision?: VisionConfig
 }
 
 export type TaskType = '学习' | '练习' | '阅读' | '其他'
@@ -75,6 +85,18 @@ export interface TasksData {
   lastUpdated: string
 }
 
+export type ImageStatus = 'pending' | 'ready' | 'used'
+
+export interface ExerciseImage {
+  id: string
+  exerciseIds: string[]
+  base64: string
+  thumbnail?: string
+  createdAt: string
+  status: ImageStatus
+  size: number
+}
+
 export type ExerciseType = '选择题' | '填空题' | '简答题' | '口算题' | '竖式计算题' | '应用题'
 
 export interface Exercise {
@@ -91,6 +113,8 @@ export interface Exercise {
   status?: 'pending' | 'completed' | 'archived'
   userAnswer?: string
   isCorrect?: boolean
+  images?: string[]
+  hasImageReference?: boolean
 }
 
 export interface ExercisesData {
@@ -167,4 +191,159 @@ export interface AgentContext {
   todayTasks: Task[]
   currentTask?: Task
   userMessage: string
+}
+
+// ==================== 短期记忆与长期记忆系统类型定义 ====================
+
+export type MessageType = 'text' | 'voice' | 'emotion'
+export type MasteryLevel = '未掌握' | '初步理解' | '基本掌握' | '熟练掌握'
+
+export interface MessageContext {
+  currentTask?: string
+  emotion?: string
+  intent?: string
+}
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+  messageType: MessageType
+  context: MessageContext
+}
+
+export interface ShortTermMemoryMetadata {
+  totalMessages: number
+  sessionCount: number
+  lastSessionTime: string
+}
+
+export type MemoryStatus = 'pending' | 'summarized'
+
+export interface ShortTermMemoryData {
+  date: string
+  userId: string
+  messages: ChatMessage[]
+  metadata: ShortTermMemoryMetadata
+  practiceSummaries?: PracticeSummary[]
+  status: MemoryStatus
+  summaryDate?: string
+  summarizedMessageCount?: number
+  summarizedPracticeCount?: number
+  createdAt: string
+  lastUpdated: string
+}
+
+export interface EmotionStats {
+  primary: string
+  distribution: Record<string, number>
+}
+
+export interface LearnedTopic {
+  topic: string
+  masteryLevel: MasteryLevel
+  practiceCount: number
+  correctRate: number
+}
+
+export type PracticeType = '选择题' | '填空题' | '简答题' | '口算题' | '竖式计算题' | '应用题' | '混合练习'
+
+export interface PracticeQuestionResult {
+  exerciseId: string
+  questionType: ExerciseType
+  question: string
+  userAnswer: string
+  correctAnswer: string
+  isCorrect: boolean
+  feedback?: string
+  relatedTopic?: string
+  timeSpent?: number
+}
+
+export interface PracticeSummary {
+  sessionId: string
+  practiceType: PracticeType
+  startTime: string
+  endTime: string
+  duration: number
+  totalQuestions: number
+  completedQuestions: number
+  correctCount: number
+  wrongCount: number
+  accuracy: number
+  performance: '优秀' | '良好' | '一般' | '需加强'
+  speedRating: '快速' | '适中' | '较慢'
+  questionResults: PracticeQuestionResult[]
+  relatedTopics: string[]
+  masteredTopics: string[]
+  weakTopics: string[]
+  keyFindings: string[]
+  improvementSuggestions: string[]
+  nextSteps: string[]
+}
+
+export interface PracticeAnalysis {
+  overallPerformance: '优秀' | '良好' | '一般' | '需加强'
+  practiceHighlights: string[]
+  areasToImprove: string[]
+  practiceSuggestions: string[]
+}
+
+export interface DailySummary {
+  date: string
+  summary: string
+  keyPoints: string[]
+  emotion: EmotionStats
+  tasksCompleted: string[]
+  studyDuration: number
+  weakPoints: string[]
+  achievements: string[]
+  learnedTopics: LearnedTopic[]
+  practiceSummaries?: PracticeSummary[]
+  totalPracticeCount?: number
+  totalPracticeTime?: number
+  overallPracticeAccuracy?: number
+  practiceAnalysis?: PracticeAnalysis
+}
+
+export interface TopicRecord {
+  topic: string
+  firstLearnedDate: string
+  lastReviewDate: string
+  masteryLevel: MasteryLevel
+  practiceCount: number
+  correctRate: number
+  relatedQuestions: string[]
+  notes: string
+  weakSubTopics?: string[]
+}
+
+export interface AccumulatedKnowledge {
+  masteredTopics: string[]
+  weakTopics: string[]
+  totalStudyDays: number
+  totalStudyHours: number
+}
+
+export interface LongTermMemoryData {
+  userId: string
+  dailySummaries: DailySummary[]
+  topicRecords: Record<string, TopicRecord>
+  accumulatedKnowledge: AccumulatedKnowledge
+  createdAt: string
+  lastUpdated: string
+}
+
+export interface ArchiveResult {
+  archived: boolean
+  summary?: DailySummary
+  error?: string
+}
+
+export interface TopicSearchResult {
+  found: boolean
+  record?: TopicRecord
+  relatedSummaries: DailySummary[]
+  suggestions: string[]
 }
