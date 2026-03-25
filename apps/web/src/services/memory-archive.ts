@@ -3,6 +3,7 @@ import { shortTermMemoryService } from './short-term-memory'
 import { longTermMemoryService } from './long-term-memory'
 import { backupMemoryWithType, getTasksByDate } from './data-service'
 import { memoryLogger } from './memory-logger'
+import { cleanupExpiredImages, cleanupByStorageLimit } from './image-storage'
 
 const ARCHIVE_STATUS_KEY = 'ai_study_archive_status'
 
@@ -346,6 +347,19 @@ function setArchiveStatus(status: Partial<ArchiveStatus>): void {
 class MemoryArchiveService {
   private isArchiving = false
 
+  async cleanupExpiredImages(): Promise<void> {
+    try {
+      const cleanedByDays = await cleanupExpiredImages(7)
+      const cleanedByLimit = await cleanupByStorageLimit(50)
+      const totalCleaned = cleanedByDays + cleanedByLimit
+      if (totalCleaned > 0) {
+        console.log(`[图片清理] 共清理 ${totalCleaned} 张过期图片`)
+      }
+    } catch (error) {
+      console.error('[图片清理] 清理失败:', error)
+    }
+  }
+
   async needsArchive(): Promise<boolean> {
     if (this.isArchiving) {
       return false
@@ -448,6 +462,8 @@ class MemoryArchiveService {
       memoryLogger.logSummaryFailed(String(error))
       console.error('Failed to generate summary:', error)
       return createDefaultSummary(messages)
+    } finally {
+      await this.cleanupExpiredImages()
     }
   }
 
@@ -490,6 +506,8 @@ class MemoryArchiveService {
       memoryLogger.logSummaryFailed(String(error))
       console.error('[记忆归档] 增量总结失败，使用简单合并:', error)
       return this.mergeWithoutLLM(existingSummary, newMessages, newPractices, tasks)
+    } finally {
+      await this.cleanupExpiredImages()
     }
   }
 

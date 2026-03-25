@@ -1,4 +1,4 @@
-import type { AppConfig, LLMConfig, TTSConfig, STTConfig, CharacterConfig } from './types'
+import type { AppConfig, LLMConfig, TTSConfig, STTConfig, CharacterConfig, VisionConfig } from './types'
 
 interface ValidationResult {
   valid: boolean
@@ -51,6 +51,25 @@ function validateCharacterConfig(config: CharacterConfig, result: ValidationResu
   }
 }
 
+function validateVisionConfig(config: VisionConfig, result: ValidationResult): void {
+  if (!config.provider) {
+    result.warnings.push('Vision provider is not specified, image recognition will be disabled')
+    return
+  }
+  if (!config.apiKey) {
+    result.warnings.push('Vision apiKey is empty, image recognition may fail')
+  }
+  if (!config.model) {
+    result.errors.push('Vision model is required when vision is enabled')
+  }
+  if (!config.baseUrl) {
+    result.warnings.push('Vision baseUrl is empty, using default')
+  }
+  if (config.timeout && config.timeout < 5000) {
+    result.warnings.push('Vision timeout is too small, minimum recommended is 5000ms')
+  }
+}
+
 export function validateConfig(config: AppConfig): ValidationResult {
   const result: ValidationResult = {
     valid: true,
@@ -86,6 +105,10 @@ export function validateConfig(config: AppConfig): ValidationResult {
     validateCharacterConfig(config.character, result)
   } else {
     result.warnings.push('Character config is missing, using defaults')
+  }
+
+  if (config.vision) {
+    validateVisionConfig(config.vision, result)
   }
 
   result.valid = result.errors.length === 0

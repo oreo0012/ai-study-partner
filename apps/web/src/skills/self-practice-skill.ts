@@ -1,6 +1,33 @@
-import type { Exercise } from '@/config/types'
+import type { Exercise, PracticeSummary, PracticeQuestionResult, PracticeType } from '@/config/types'
 import { loadExercises } from '@/services/data-service'
+import { shortTermMemoryService } from '@/services/short-term-memory'
 import { useChatStore } from '@/stores'
+
+function generateSessionId(): string {
+  return `practice_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+}
+
+function determinePracticeType(exercises: Exercise[]): PracticeType {
+  const types = new Set(exercises.map(e => e.type))
+  if (types.size === 1) {
+    return exercises[0].type as PracticeType
+  }
+  return '混合练习'
+}
+
+function calculatePerformance(accuracy: number): '优秀' | '良好' | '一般' | '需加强' {
+  if (accuracy >= 0.9) return '优秀'
+  if (accuracy >= 0.7) return '良好'
+  if (accuracy >= 0.5) return '一般'
+  return '需加强'
+}
+
+function calculateSpeedRating(durationMinutes: number, questionCount: number): '快速' | '适中' | '较慢' {
+  const avgTimePerQuestion = durationMinutes * 60 / questionCount
+  if (avgTimePerQuestion < 30) return '快速'
+  if (avgTimePerQuestion < 60) return '适中'
+  return '较慢'
+}
 
 export interface PracticeSession {
   exercises: Exercise[]
@@ -51,23 +78,27 @@ export class SelfPracticeSkill {
 
   private async showCurrentQuestion(): Promise<void> {
     if (!this.session) return
-    
+
     const exercise = this.session.exercises[this.session.currentIndex]
     const questionNumber = this.session.currentIndex + 1
-    
+
     let questionText = `第 ${questionNumber} 题，`
     questionText += `(${exercise.type}) `
     questionText += `${exercise.question}`
-    
+
+    if (exercise.images && exercise.images.length > 0) {
+      questionText += `\n\n[本题包含 ${exercise.images.length} 张图片，请查看屏幕下方图片区域]`
+    }
+
     if (exercise.type === '选择题' && exercise.options) {
       questionText += '\n'
       exercise.options.forEach((option, index) => {
         questionText += `${String.fromCharCode(65 + index)}. ${option}  `
       })
     }
-    
+
     this.chatStore.addAssistantMessage(questionText)
-    
+
     await this.chatStore.speakText(questionText)
   }
 
@@ -108,7 +139,7 @@ export class SelfPracticeSkill {
     try {
       const response = await this.chatStore.generateResponse(prompt)
       
-      const isCorrect = response.includes('正确') || response.includes('✅')
+      const isCorrect = this.checkAnswerCorrectness(response)
       
       if (isCorrect) {
         const encouragements = [
@@ -137,6 +168,52 @@ export class SelfPracticeSkill {
         feedback: '抱歉，判断答案时出错了。让我们继续下一题吧！'
       }
     }
+  }
+
+  private checkAnswerCorrectness(response: string): boolean {
+    const lowerResponse = response.toLowerCase()
+    
+    const correctIndicators = [
+      '正确',
+      '对了',
+      '答对了',
+      '算对了',
+      '做对了',
+      '完全正确',
+      '完全对',
+      '答得对',
+      '✅',
+      '✓',
+      '√',
+      '对的',
+      '是对的'
+    ]
+    
+    const wrongIndicators = [
+      '有些问题',
+      '不对',
+      '差一点',
+      '算错了',
+      '不太对',
+      '不正确',
+      '❌',
+      '✗',
+      '有点问题'
+    ]
+    
+    for (const indicator of wrongIndicators) {
+      if (lowerResponse.includes(indicator.toLowerCase())) {
+        return false
+      }
+    }
+    
+    for (const indicator of correctIndicators) {
+      if (lowerResponse.includes(indicator.toLowerCase())) {
+        return true
+      }
+    }
+    
+    return false
   }
 
   private buildEvaluationPrompt(exercise: Exercise, userAnswer: string): string {
@@ -180,6 +257,9 @@ export class SelfPracticeSkill {
     await this.updateRelatedTaskStatus()
     
     await this.savePracticeRecord(totalQuestions, correctCount, wrongCount)
+    
+    const practiceSummary = this.generatePracticeSummary(totalQuestions, correctCount, wrongCount)
+    await this.savePracticeSummaryToMemory(practiceSummary)
     
     const summaryText = await this.generateSummaryWithLLM(totalQuestions, correctCount, wrongCount)
     
@@ -254,6 +334,76 @@ export class SelfPracticeSkill {
     })
   }
 
+  private generatePracticeSummary(total: number, correct: number, wrong: number): PracticeSummary {
+    if (!this.session || !this.session.endTime) {
+      throw new Error('No active practice session')
+    }
+
+    const duration = Math.round((this.session.endTime.getTime() - this.session.startTime.getTime()) / 60000)
+    const accuracy = total > 0 ? correct / total : 0
+    
+    const questionResults: PracticeQuestionResult[] = this.session.exercises.map(ex => {
+      const result = this.session!.results.get(ex.id)
+      const userAnswer = this.session!.answers.get(ex.id)
+      
+      return {
+        exerciseId: ex.id,
+        questionType: ex.type,
+        question: ex.question,
+        userAnswer: userAnswer || '',
+        correctAnswer: ex.answer || '',
+        isCorrect: result?.isCorrect || false,
+        feedback: result?.feedback,
+        relatedTopic: ex.chapter || ex.subject
+      }
+    })
+
+    const wrongExercises = this.session.exercises.filter(ex => {
+      const result = this.session!.results.get(ex.id)
+      return result && !result.isCorrect
+    })
+
+    const correctExercises = this.session.exercises.filter(ex => {
+      const result = this.session!.results.get(ex.id)
+      return result && result.isCorrect
+    })
+
+    const weakTopics = [...new Set(wrongExercises.map(ex => ex.chapter || ex.subject).filter(Boolean) as string[])]
+    const masteredTopics = [...new Set(correctExercises.map(ex => ex.chapter || ex.subject).filter(Boolean) as string[])]
+    const relatedTopics = [...new Set(this.session.exercises.map(ex => ex.chapter || ex.subject).filter(Boolean) as string[])]
+
+    return {
+      sessionId: generateSessionId(),
+      practiceType: determinePracticeType(this.session.exercises),
+      startTime: this.session.startTime.toISOString(),
+      endTime: this.session.endTime.toISOString(),
+      duration,
+      totalQuestions: total,
+      completedQuestions: total,
+      correctCount: correct,
+      wrongCount: wrong,
+      accuracy,
+      performance: calculatePerformance(accuracy),
+      speedRating: calculateSpeedRating(duration, total),
+      questionResults,
+      relatedTopics,
+      masteredTopics,
+      weakTopics,
+      keyFindings: [],
+      improvementSuggestions: [],
+      nextSteps: []
+    }
+  }
+
+  private async savePracticeSummaryToMemory(summary: PracticeSummary): Promise<void> {
+    try {
+      await shortTermMemoryService.savePracticeSummary(summary)
+      console.log(`[自主练习] 练习总结已保存到短期记忆: ${summary.sessionId}`)
+    } catch (error) {
+      console.error('[自主练习] 保存练习总结失败:', error)
+    }
+  }
+
   private generateFallbackSummary(total: number, correct: number, wrong: number): string {
     let summary = `你真棒，全部题目都完成啦！🎉\n\n`
     summary += `**成绩单**\n`
@@ -282,18 +432,37 @@ export class SelfPracticeSkill {
       return result && !result.isCorrect
     })
     
+    const correctExercises = this.session.exercises.filter((ex) => {
+      const result = this.session.results.get(ex.id)
+      return result && result.isCorrect
+    })
+    
     const { loadMemory } = await import('@/services/data-service')
     const memoryData = await loadMemory()
     const userName = memoryData?.profile?.name || '宝贝'
     
-    let prompt = `你是一位品学兼优且极具耐心的好学生，你正在辅导你最好的朋友${userName}学习，你们刚刚完成了一次练习。\n\n`
-    prompt += `练习情况：\n`
-    prompt += `- 总题数：${totalQuestions}\n`
-    prompt += `- 正确数：${correctCount}\n`
-    prompt += `- 错误数：${wrongCount}\n\n`
+    let prompt = `你是一位品学兼优且极具耐心的好学生，你正在辅导你最好的朋友${userName}学习，你们刚刚完成了一次练习。
+
+【重要规则】
+- 必须使用"${userName}"称呼用户，绝对不要使用其他名字如"小明"、"小红"等
+- 对于答对的题目，只需要说"真棒"或"继续保持"等简单鼓励，不要讲解解题过程
+- 只对答错的题目进行讲解
+
+练习情况：
+- 总题数：${totalQuestions}
+- 正确数：${correctCount}
+- 错误数：${wrongCount}
+`
+    
+    if (correctExercises.length > 0) {
+      prompt += `\n答对的题目（共${correctExercises.length}题，只需简单鼓励，不要讲解）：\n`
+      correctExercises.forEach((ex, index) => {
+        prompt += `${index + 1}. ${ex.question}\n`
+      })
+    }
     
     if (wrongExercises.length > 0) {
-      prompt += `做错的题目：\n`
+      prompt += `\n做错的题目（共${wrongExercises.length}题，需要讲解）：\n`
       wrongExercises.forEach((ex, index) => {
         const userAnswer = this.session.answers.get(ex.id)
         prompt += `${index + 1}. ${ex.question}\n`
@@ -302,14 +471,12 @@ export class SelfPracticeSkill {
       })
     }
     
-    prompt += `请生成一段总结报告，要求：\n`
-    prompt += `1. 先表扬${userName}完成了所有题目\n`
-    prompt += `2. 如果有错题，温和地指出错误,并给出正确答案和解题思路，适合小学生理解\n`
-    prompt += `3. 回答正确的题目不用点评，鼓励孩子继续保持\n`
-    prompt += `4. 如果有错题，询问是否需要类似的题目来巩固\n`
-    prompt += `5. 语气要友好、亲切，像朋友一样\n`
-    prompt += `6. 鼓励孩子继续努力\n`
-    prompt += `7. 不超过100字\n`  
+    prompt += `\n请生成一段总结报告，要求：
+1. 首先表扬${userName}完成了所有题目
+2. 对于答对的题目，只说"${userName}真棒，这些题都对了！"之类的话，不要讲解
+3. 只对做错的题目进行讲解，给出正确答案和解题思路
+4. 语气要友好、亲切，像朋友一样
+5. 不超过100字`  
     
     try {
       const response = await this.chatStore.generateResponse(prompt)
