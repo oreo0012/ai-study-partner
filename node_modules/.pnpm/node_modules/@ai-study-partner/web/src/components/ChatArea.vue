@@ -1,31 +1,48 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
-import { useChatStore } from '@/stores/chat'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useChatStore, useTaskStore, useMemoryStore } from '@/stores'
 import ChatMessage from './ChatMessage.vue'
 import ChatInput from './ChatInput.vue'
+import TaskPanel from './TaskPanel.vue'
 
+const router = useRouter()
 const chatStore = useChatStore()
+const taskStore = useTaskStore()
+const memoryStore = useMemoryStore()
 const messagesContainer = ref<HTMLElement | null>(null)
+
+const todayTasks = computed(() => taskStore.todayTasks)
+const completedCount = computed(() => taskStore.completedTasks.length)
+const totalCount = computed(() => taskStore.todayTasks.length)
+const hasTodayTasks = computed(() => totalCount.value > 0)
+const isMemoryLoading = computed(() => memoryStore.isLoading || memoryStore.isArchiveInProgress)
+
+onMounted(async () => {
+  await taskStore.loadTodayTasks()
+  
+  scrollToBottom()
+})
+
+function scrollToBottom() {
+  nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+  })
+}
 
 watch(
   () => chatStore.messages.length,
   () => {
-    nextTick(() => {
-      if (messagesContainer.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-      }
-    })
+    scrollToBottom()
   }
 )
 
 watch(
   () => chatStore.streamingMessage,
   () => {
-    nextTick(() => {
-      if (messagesContainer.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-      }
-    })
+    scrollToBottom()
   }
 )
 
@@ -36,6 +53,18 @@ function handleSend(message: string) {
 function handleVoice() {
   console.log('Voice input triggered')
 }
+
+async function handleTaskComplete(taskId: string) {
+  await taskStore.completeTask(taskId)
+}
+
+function handleStartPractice(taskId: string) {
+  router.push('/')
+  
+  nextTick(() => {
+    chatStore.sendMessage('开始自主练习')
+  })
+}
 </script>
 
 <template>
@@ -45,7 +74,15 @@ function handleVoice() {
       class="messages-container flex-1 overflow-y-auto p-4"
     >
       <div
-        v-if="!chatStore.hasMessages"
+        v-if="isMemoryLoading"
+        class="memory-loading flex items-center justify-center p-4 text-gray-500"
+      >
+        <div class="i-carbon-renew animate-spin text-xl mr-2" />
+        <span>正在加载记忆...</span>
+      </div>
+      
+      <div
+        v-if="!chatStore.hasMessages && !isMemoryLoading"
         class="empty-state flex flex-col items-center justify-center h-full text-gray-400"
       >
         <div class="i-carbon-chat-bot text-6xl mb-4" />
@@ -63,7 +100,7 @@ function handleVoice() {
         class="chat-message assistant flex gap-3 p-4 rounded-xl mb-3 bg-gray-100 mr-8"
       >
         <div class="avatar w-10 h-10 rounded-full flex-shrink-0 bg-purple-500 flex items-center justify-center">
-          <span class="text-white text-lg">🤖</span>
+          <span class="text-white text-lg">👧</span>
         </div>
         <div class="content flex-1">
           <div class="text text-gray-800">
@@ -81,9 +118,18 @@ function handleVoice() {
       </div>
     </div>
     
+    <TaskPanel
+      v-if="hasTodayTasks"
+      :tasks="todayTasks"
+      :completed-count="completedCount"
+      :total-count="totalCount"
+      @task-complete="handleTaskComplete"
+      @start-practice="handleStartPractice"
+    />
+    
     <div class="input-area p-4">
       <ChatInput
-        :disabled="chatStore.isGenerating"
+        :disabled="chatStore.isGenerating || isMemoryLoading"
         @send="handleSend"
         @voice="handleVoice"
       />

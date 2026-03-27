@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTaskStore } from '@/stores'
+import { useTaskStore, useChatStore } from '@/stores'
 import ExercisePractice from '@/components/ExercisePractice.vue'
 import type { Exercise } from '@/config/types'
+import { loadExercises } from '@/services/data-service'
 
 const router = useRouter()
 const taskStore = useTaskStore()
+const chatStore = useChatStore()
 
 const isLoading = ref(true)
 const exercises = ref<Exercise[]>([])
@@ -32,12 +34,17 @@ const progress = computed(() => {
 const totalCount = computed(() => exercises.value.length)
 const currentNumber = computed(() => currentIndex.value + 1)
 
+const loadingMessage = computed(() => {
+  if (isLoading.value) return '加载习题中...'
+  if (exercises.value.length === 0) return '暂无习题，请让家长上传试卷'
+  return `已加载 ${exercises.value.length} 道习题`
+})
+
 onMounted(async () => {
   isLoading.value = true
   try {
-    const data = await fetch('/data/exercises.json')
-    const json = await data.json()
-    exercises.value = json.exercises || []
+    const exercisesData = await loadExercises()
+    exercises.value = exercisesData.exercises || []
     await taskStore.loadTodayTasks()
     const practiceTask = taskStore.todayTasks.find(t => t.type === '练习')
     if (practiceTask) {
@@ -52,9 +59,11 @@ onMounted(async () => {
 
 function startPractice() {
   if (exercises.value.length > 0) {
-    isPracticeActive.value = true
-    currentIndex.value = 0
-    practiceResult.value = null
+    router.push('/')
+    
+    nextTick(() => {
+      chatStore.sendMessage('开始自主练习')
+    })
   }
 }
 
@@ -116,6 +125,7 @@ function retryPractice() {
               <span class="stat-label">总题数</span>
             </div>
           </div>
+          <p class="loading-message">{{ loadingMessage }}</p>
           <button 
             class="start-button" 
             @click="startPractice"
@@ -321,6 +331,13 @@ function retryPractice() {
 .stat-label {
   font-size: 0.875rem;
   color: #6b7280;
+}
+
+.loading-message {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+  text-align: center;
 }
 
 .start-button {

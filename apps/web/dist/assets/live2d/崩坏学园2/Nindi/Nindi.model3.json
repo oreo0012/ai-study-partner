@@ -1,0 +1,47 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "Nindi.moc",
+		"Textures": [
+			"Nindi.2048/texture_00.png"
+		],
+		"Physics": "Nindi.physics3.json",
+		"Motions": {
+			"Idle": [
+				{"File": "motions/idle.mtn"},
+				{"File": "motions/5_JP.mtn"},
+				{"File": "motions/6_JP.mtn"}
+			],
+			"Flick": [
+				{"File": "motions/2_JP.mtn"}
+			],
+			"Tap": [
+				{"File": "motions/1_JP.mtn"}
+			],
+			"Shake": [
+				{"File": "motions/7_JP.mtn"}
+			],
+			"Tap@Body": [
+				{"File": "motions/3_JP.mtn"},
+				{"File": "motions/4_JP.mtn"}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": ["ParamEyeLOpen", "ParamEyeROpen"]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": ["ParamMouthOpenY"]
+		}
+	],
+	"HitAreas": [
+		{"Id": "HitAreaHead", "Name": "Head"},
+		{"Id": "HitAreaFace", "Name": "Face"},
+		{"Id": "HitAreaBody", "Name": "Body"}
+	]
+}

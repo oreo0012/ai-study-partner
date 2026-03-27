@@ -28,7 +28,10 @@ const typeLabel = computed(() => {
   const labels: Record<ExerciseType, string> = {
     '选择题': '单选题',
     '填空题': '填空题',
-    '简答题': '简答题'
+    '简答题': '简答题',
+    '口算题': '口算题',
+    '竖式计算题': '竖式计算题',
+    '应用题': '应用题'
   }
   return labels[props.exercise.type] || props.exercise.type
 })
@@ -37,7 +40,10 @@ const typeIcon = computed(() => {
   const icons: Record<ExerciseType, string> = {
     '选择题': '🔘',
     '填空题': '✏️',
-    '简答题': '📝'
+    '简答题': '📝',
+    '口算题': '🔢',
+    '竖式计算题': '📐',
+    '应用题': '📖'
   }
   return icons[props.exercise.type] || '📝'
 })
@@ -175,6 +181,64 @@ function generateSuggestions(
           placeholder="请输入答案..."
           @keyup.enter="submitFillIn"
         />
+        <button
+          v-if="!isAnswered"
+          class="submit-button"
+          :disabled="!userAnswer.trim()"
+          @click="submitFillIn"
+        >
+          提交答案
+        </button>
+      </div>
+
+      <div v-else-if="exercise.type === '口算题'" class="fillin-section">
+        <input
+          v-model="userAnswer"
+          type="text"
+          class="fillin-input"
+          :class="{ 'answered': isAnswered }"
+          :disabled="isAnswered"
+          placeholder="请输入计算结果..."
+          @keyup.enter="submitFillIn"
+        />
+        <button
+          v-if="!isAnswered"
+          class="submit-button"
+          :disabled="!userAnswer.trim()"
+          @click="submitFillIn"
+        >
+          提交答案
+        </button>
+      </div>
+
+      <div v-else-if="exercise.type === '竖式计算题'" class="fillin-section">
+        <textarea
+          v-model="userAnswer"
+          class="fillin-textarea"
+          :class="{ 'answered': isAnswered }"
+          :disabled="isAnswered"
+          placeholder="请输入计算过程和结果..."
+          rows="4"
+        ></textarea>
+        <button
+          v-if="!isAnswered"
+          class="submit-button"
+          :disabled="!userAnswer.trim()"
+          @click="submitFillIn"
+        >
+          提交答案
+        </button>
+      </div>
+
+      <div v-else-if="exercise.type === '应用题'" class="fillin-section">
+        <textarea
+          v-model="userAnswer"
+          class="fillin-textarea"
+          :class="{ 'answered': isAnswered }"
+          :disabled="isAnswered"
+          placeholder="请写出解题步骤和答案..."
+          rows="6"
+        ></textarea>
         <button
           v-if="!isAnswered"
           class="submit-button"

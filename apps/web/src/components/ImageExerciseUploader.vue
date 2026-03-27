@@ -7,9 +7,9 @@ import {
   compressImage
 } from '@/services/image-exercise-parser'
 import { saveImage, updateImageStatus } from '@/services/image-storage'
-import { addExercises } from '@/services/data-service'
 import { getConfig } from '@/config/loader'
-import type { Exercise } from '@/config/types'
+import { createLogger, generateNewRequestId, type VisionLogger } from '@/services/vision-logger'
+import type { Exercise, VisionModelConfig } from '@/config/types'
 
 interface ImageUploadResult {
   exercises: Exercise[]
@@ -25,6 +25,21 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024
 const MAX_IMAGE_COUNT = 5
 const COMPRESS_MAX_WIDTH = 1920
 
+const DEFAULT_RECOGNITION_MODELS: Record<'fast' | 'precise', VisionModelConfig> = {
+  fast: {
+    model: 'Qwen/Qwen3-VL-32B-Instruct',
+    name: '快速识别',
+    description: '速度优先，适合简单试卷'
+  },
+  precise: {
+    model: 'Qwen/Qwen3.5-397B-A17B',
+    name: '精确识别',
+    description: '精准优先，适合复杂试卷'
+  }
+}
+
+const RECOGNITION_MODELS = ref<Record<'fast' | 'precise', VisionModelConfig>>({ ...DEFAULT_RECOGNITION_MODELS })
+
 const videoRef = ref<HTMLVideoElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -39,11 +54,18 @@ const errorMessage = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 const recognizingProgress = ref<string>('')
 const visionApiKey = ref<string>('')
+let currentLogger: VisionLogger | null = null
 
 onMounted(() => {
   const config = getConfig()
   if (config?.vision?.apiKey) {
     visionApiKey.value = config.vision.apiKey
+  }
+  if (config?.vision?.models?.fast) {
+    RECOGNITION_MODELS.value.fast = config.vision.models.fast
+  }
+  if (config?.vision?.models?.precise) {
+    RECOGNITION_MODELS.value.precise = config.vision.models.precise
   }
 })
 
@@ -77,29 +99,77 @@ async function handleFileSelect(event: Event) {
 }
 
 async function processSelectedFiles(files: File[]) {
+  const logger = createLogger('ImageUploader', generateNewRequestId())
+  currentLogger = logger
+  
   errorMessage.value = null
+  
+  logger.logPhaseStart('图片选择上传', {
+    fileCount: files.length,
+    maxAllowed: MAX_IMAGE_COUNT
+  })
 
   const remainingSlots = MAX_IMAGE_COUNT - selectedImages.value.length
   const filesToProcess = files.slice(0, remainingSlots)
 
   if (files.length > remainingSlots) {
-    errorMessage.value = `最多只能选择${MAX_IMAGE_COUNT}张图片，已选择前${remainingSlots}张`
+    const warnMsg = `最多只能选择${MAX_IMAGE_COUNT}张图片，已选择前${remainingSlots}张`
+    errorMessage.value = warnMsg
+    logger.warn('超出图片数量限制', {
+      requested: files.length,
+      remaining: remainingSlots,
+      processed: filesToProcess.length
+    })
   }
 
   for (const file of filesToProcess) {
+    const fileStartTime = Date.now()
+    
+    logger.info('开始处理图片文件', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    })
+    
     const validation = validateImage(file)
     if (!validation.valid) {
       errorMessage.value = validation.error || '图片验证失败'
+      logger.error('图片验证失败', undefined, {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        error: validation.error
+      })
       continue
     }
 
     try {
       const preview = await fileToBase64(file)
       selectedImages.value.push({ file, preview })
+      
+      const fileDuration = Date.now() - fileStartTime
+      logger.logSuccess('图片上传成功', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        previewLength: preview.length,
+        uploadDuration: fileDuration
+      })
     } catch (error) {
       errorMessage.value = `图片读取失败: ${error instanceof Error ? error.message : '未知错误'}`
+      logger.error('图片读取失败', error instanceof Error ? error : new Error(String(error)), {
+        fileName: file.name,
+        fileSize: file.size
+      })
     }
   }
+  
+  logger.logPhaseEnd('图片选择上传', {
+    totalProcessed: filesToProcess.length,
+    successCount: selectedImages.value.length,
+    finalImageCount: selectedImages.value.length
+  })
 }
 
 function removeImage(index: number) {
@@ -185,56 +255,137 @@ async function capturePhoto() {
   }
 }
 
-async function recognizeImages() {
+async function recognizeImages(mode: 'fast' | 'precise') {
+  const logger = currentLogger || createLogger('ImageRecognizer', generateNewRequestId())
+  
   if (!hasImages.value) {
     errorMessage.value = '请先选择图片'
+    logger.warn('识别失败：未选择图片')
     return
   }
 
   if (!visionApiKey.value) {
     errorMessage.value = '请先配置视觉识别API密钥'
+    logger.warn('识别失败：未配置API密钥')
     return
   }
 
+  const selectedModel = RECOGNITION_MODELS.value[mode]
+  
   errorMessage.value = null
   successMessage.value = null
   isRecognizing.value = true
   recognizedExercises.value = []
+
+  logger.logPhaseStart('图片内容识别', {
+    imageCount: selectedImages.value.length,
+    hasApiKey: !!visionApiKey.value,
+    mode: selectedModel.name,
+    model: selectedModel.model
+  })
 
   try {
     const allExercises: Omit<Exercise, 'id' | 'createdAt' | 'status' | 'hash'>[] = []
     const config = getConfig()
 
     for (let i = 0; i < selectedImages.value.length; i++) {
+      const imageStartTime = Date.now()
       recognizingProgress.value = `正在识别第 ${i + 1} / ${selectedImages.value.length} 张图片...`
 
-      const { preview } = selectedImages.value[i]
+      const { preview, file } = selectedImages.value[i]
+      
+      logger.info('开始识别单张图片', {
+        imageIndex: i + 1,
+        totalImages: selectedImages.value.length,
+        originalSize: preview.length,
+        fileName: file.name
+      })
 
       let imageBase64 = preview
+      let compressed = false
+      
       if (preview.length > 100000) {
         recognizingProgress.value = `正在压缩第 ${i + 1} 张图片...`
+        logger.info('图片需要压缩', {
+          originalSize: preview.length,
+          threshold: 100000
+        })
+        
         imageBase64 = await compressImage(preview, COMPRESS_MAX_WIDTH, 0.8)
+        compressed = true
+        
+        logger.info('图片压缩完成', {
+          compressedSize: imageBase64.length,
+          compressionRatio: ((preview.length - imageBase64.length) / preview.length * 100).toFixed(2) + '%'
+        })
       }
+
+      logger.logPhaseStart('VL模型请求', {
+        imageIndex: i + 1,
+        imageSize: imageBase64.length,
+        compressed,
+        model: selectedModel.model
+      })
 
       const exercises = await parseImageToExercises(
         imageBase64,
         visionApiKey.value,
-        config?.vision
+        {
+          ...config?.vision,
+          model: selectedModel.model
+        }
       )
+      
+      const imageDuration = Date.now() - imageStartTime
+      
+      logger.logPhaseEnd('VL模型请求', {
+        imageIndex: i + 1,
+        recognizedCount: exercises.length,
+        requestDuration: imageDuration
+      })
+      
+      logger.info('单张图片识别完成', {
+        imageIndex: i + 1,
+        exerciseCount: exercises.length,
+        duration: imageDuration
+      })
+      
       allExercises.push(...exercises)
     }
 
     recognizedExercises.value = allExercises
     recognizingProgress.value = ''
 
+    logger.logPhaseEnd('图片内容识别', {
+      totalExercises: allExercises.length,
+      totalImages: selectedImages.value.length
+    })
+
     if (allExercises.length === 0) {
       errorMessage.value = '未能识别到习题内容，请上传更清晰的图片'
+      logger.warn('识别结果为空', { totalImages: selectedImages.value.length })
     } else {
       successMessage.value = `成功识别到 ${allExercises.length} 道习题`
+      
+      const typeDistribution: Record<string, number> = {}
+      allExercises.forEach(ex => {
+        typeDistribution[ex.type] = (typeDistribution[ex.type] || 0) + 1
+      })
+      
+      logger.logSuccess('图片识别全部完成', {
+        totalExercises: allExercises.length,
+        typeDistribution,
+        totalDuration: logger.getElapsedTime()
+      })
     }
   } catch (error) {
-    errorMessage.value = `识别失败: ${error instanceof Error ? error.message : '未知错误'}`
+    const err = error instanceof Error ? error : new Error(String(error))
+    errorMessage.value = `识别失败: ${err.message}`
     recognizedExercises.value = []
+    
+    logger.logFailure('图片识别失败', err, {
+      totalImages: selectedImages.value.length
+    })
   } finally {
     isRecognizing.value = false
     recognizingProgress.value = ''
@@ -242,44 +393,66 @@ async function recognizeImages() {
 }
 
 async function confirmUpload() {
+  const logger = currentLogger || createLogger('ExerciseUploader', generateNewRequestId())
+  
   if (!hasRecognizedExercises.value) {
     errorMessage.value = '请先识别图片中的习题'
+    logger.warn('上传失败：未识别习题')
     return
   }
 
   isUploading.value = true
   errorMessage.value = null
+  
+  logger.logPhaseStart('习题确认上传', {
+    exerciseCount: recognizedExercises.value.length
+  })
 
   try {
-    const savedExercises: Exercise[] = []
-
-    for (const exercise of recognizedExercises.value) {
-      const result = await addExercises([exercise])
-      if (result.length > 0) {
-        savedExercises.push(result[0])
-      }
-    }
-
     let imageId = ''
+    const imageSaveStartTime = Date.now()
+    
     for (const { preview, file } of selectedImages.value) {
       try {
-        const id = await saveImage(preview, savedExercises.map(e => e.id), file.size)
-        await updateImageStatus(id, 'used', savedExercises.map(e => e.id))
+        const id = await saveImage(preview, [], file.size)
         imageId = id
+        
+        logger.info('图片数据保存完成', {
+          imageId: id,
+          imageSize: file.size
+        })
       } catch (error) {
-        console.error('Failed to save image:', error)
+        logger.error('图片保存失败', error instanceof Error ? error : new Error(String(error)), {
+          fileName: file.name
+        })
       }
     }
 
+    logger.logPhaseEnd('习题确认上传', {
+      totalImages: selectedImages.value.length,
+      imageSaveDuration: Date.now() - imageSaveStartTime,
+      totalDuration: logger.getElapsedTime()
+    })
+
     emit('upload', {
-      exercises: savedExercises,
+      exercises: recognizedExercises.value as Exercise[],
       imageId
     })
 
     resetState()
-    successMessage.value = `成功上传 ${savedExercises.length} 道习题`
+    successMessage.value = `正在处理 ${recognizedExercises.value.length} 道习题...`
+    
+    logger.logSuccess('习题确认上传完成', {
+      exerciseCount: recognizedExercises.value.length,
+      totalDuration: logger.getElapsedTime()
+    })
   } catch (error) {
-    errorMessage.value = `上传失败: ${error instanceof Error ? error.message : '未知错误'}`
+    const err = error instanceof Error ? error : new Error(String(error))
+    errorMessage.value = `上传失败: ${err.message}`
+    
+    logger.logFailure('习题上传失败', err, {
+      exerciseCount: recognizedExercises.value.length
+    })
   } finally {
     isUploading.value = false
   }
@@ -401,14 +574,33 @@ const typeStats = computed(() => {
       </div>
 
       <div v-if="hasImages && !hasRecognizedExercises" class="recognize-section">
-        <button
-          class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          :disabled="isRecognizing"
-          @click="recognizeImages"
-        >
-          <div v-if="isRecognizing" class="i-carbon-circle-dash animate-spin" />
-          {{ isRecognizing ? recognizingProgress : '开始识别' }}
-        </button>
+        <p class="text-sm text-gray-500 mb-3 text-center">请选择识别模式</p>
+        <div class="recognize-buttons flex gap-3">
+          <button
+            class="flex-1 py-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-1"
+            :disabled="isRecognizing"
+            @click="recognizeImages('fast')"
+          >
+            <span class="text-2xl">⚡</span>
+            <span class="font-bold">{{ RECOGNITION_MODELS.fast.name }}</span>
+            <span class="text-xs opacity-80">{{ RECOGNITION_MODELS.fast.description }}</span>
+          </button>
+          <button
+            class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-1"
+            :disabled="isRecognizing"
+            @click="recognizeImages('precise')"
+          >
+            <span class="text-2xl">🎯</span>
+            <span class="font-bold">{{ RECOGNITION_MODELS.precise.name }}</span>
+            <span class="text-xs opacity-80">{{ RECOGNITION_MODELS.precise.description }}</span>
+          </button>
+        </div>
+        <div v-if="isRecognizing" class="recognizing-progress mt-3 p-3 bg-blue-50 rounded-lg text-center">
+          <div class="flex items-center justify-center gap-2 text-blue-600">
+            <div class="i-carbon-circle-dash animate-spin" />
+            <span>{{ recognizingProgress }}</span>
+          </div>
+        </div>
       </div>
 
       <div v-if="hasRecognizedExercises" class="recognized-section mt-4">
@@ -448,7 +640,7 @@ const typeStats = computed(() => {
             class="preview-item py-3 px-4 bg-white border-b border-gray-100 last:border-0"
           >
             <p class="text-sm text-gray-600">
-              <span class="font-medium text-gray-700">{{ index + 1 }}. [{{ exercise.type }}]</span>
+              <span class="font-medium text-gray-700">{{ exercise.questionNumber || index + 1 }}. [{{ exercise.type }}]</span>
               {{ exercise.question.substring(0, 60) }}{{ exercise.question.length > 60 ? '...' : '' }}
             </p>
           </div>

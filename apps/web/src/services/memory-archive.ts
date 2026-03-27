@@ -1,7 +1,7 @@
 import type { ChatMessage, DailySummary, ArchiveResult, EmotionStats, LearnedTopic, PracticeSummary, Task } from '@/config/types'
 import { shortTermMemoryService } from './short-term-memory'
 import { longTermMemoryService } from './long-term-memory'
-import { backupMemoryWithType, getTasksByDate } from './data-service'
+import { backupMemoryWithType, getTasksByDate, cleanupExpiredExercises, archiveCompletedExercises } from './data-service'
 import { memoryLogger } from './memory-logger'
 import { cleanupExpiredImages, cleanupByStorageLimit } from './image-storage'
 
@@ -814,6 +814,15 @@ class MemoryArchiveService {
       await shortTermMemoryService.clear()
       memoryLogger.logShortTermClear('success')
       console.log('[记忆归档] 短期记忆已清除')
+      
+      await archiveCompletedExercises()
+      console.log('[记忆归档] 已完成习题已归档')
+      
+      await cleanupExpiredExercises()
+      console.log('[记忆归档] 过期习题已清理')
+      
+      await cleanupExpiredImages()
+      console.log('[记忆归档] 过期图片已清理')
       
       await shortTermMemoryService.initializeTodayMemory()
       console.log('[记忆归档] 今日记忆已初始化')

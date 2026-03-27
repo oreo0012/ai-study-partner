@@ -1,0 +1,46 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "houraiji.moc",
+		"Textures": [
+			"houraiji.2048/texture_00.png"
+		],
+		"Physics": "houraiji.physics3.json",
+		"Motions": {
+			"Idle": [
+				{"File": "motions/idle.mtn"},
+				{"File": "motions/5.mtn"}
+			],
+			"Flick": [
+				{"File": "motions/1.mtn"}
+			],
+			"Tap": [
+				{"File": "motions/2.mtn"}
+			],
+			"Shake": [
+				{"File": "motions/6.mtn"}
+			],
+			"Tap@Body": [
+				{"File": "motions/3.mtn"},
+				{"File": "motions/4.mtn"}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": ["ParamEyeLOpen", "ParamEyeROpen"]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": ["ParamMouthOpenY"]
+		}
+	],
+	"HitAreas": [
+		{"Id": "HitAreaHead", "Name": "Head"},
+		{"Id": "HitAreaFace", "Name": "Face"},
+		{"Id": "HitAreaBody", "Name": "Body"}
+	]
+}

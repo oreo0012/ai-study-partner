@@ -1,4 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { cleanupExpiredExercises, archiveCompletedExercises } from '@/services/data-service'
+
+onMounted(async () => {
+  try {
+    await cleanupExpiredExercises()
+    await archiveCompletedExercises()
+    console.log('[App] Exercise cleanup and archive completed on startup')
+  } catch (error) {
+    console.error('[App] Failed to cleanup/archive exercises:', error)
+  }
+})
 </script>
 
 <template>

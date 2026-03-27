@@ -6,9 +6,9 @@ import TaskCreator from '@/components/TaskCreator.vue'
 import TaskList from '@/components/TaskList.vue'
 import TaskEditor from '@/components/TaskEditor.vue'
 import ExerciseUploader from '@/components/ExerciseUploader.vue'
-import { addExercises } from '@/services/data-service'
-import type { Task, TaskType, TaskStatus } from '@/config/types'
-import type { ParsedExercise } from '@/services/exercise-parser'
+import DailyLearningReport from '@/components/DailyLearningReport.vue'
+import { addExercises, loadExercises, saveExercises, deleteExercises } from '@/services/data-service'
+import type { Task, TaskType, TaskStatus, Exercise } from '@/config/types'
 
 const router = useRouter()
 const taskStore = useTaskStore()
@@ -19,7 +19,7 @@ const passwordInput = ref('')
 const passwordError = ref('')
 const correctPassword = '123456'
 
-const activeTab = ref<'tasks' | 'exercises'>('tasks')
+const activeTab = ref<'tasks' | 'exercises' | 'report'>('tasks')
 
 const isMobile = ref(false)
 
@@ -29,6 +29,9 @@ const currentEditTask = ref<Task | null>(null)
 
 const uploadSuccess = ref(false)
 const uploadMessage = ref('')
+
+const showOverwriteConfirm = ref(false)
+const pendingExercises = ref<{ exercises: Exercise[]; imageId: string } | null>(null)
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 768
@@ -147,10 +150,38 @@ const closeTaskEditor = () => {
 const pendingTasksCount = computed(() => taskStore.pendingTasks.length)
 const completedTasksCount = computed(() => taskStore.completedTasks.length)
 
-const handleExerciseUpload = async (result: { exercises: ParsedExercise[]; filename: string }) => {
+const handleExerciseUpload = async (result: { exercises: Exercise[]; imageId: string }) => {
   try {
+    const exercisesData = await loadExercises()
+    const hasExistingExercises = exercisesData.exercises.length > 0
+    
+    if (hasExistingExercises) {
+      pendingExercises.value = result
+      showOverwriteConfirm.value = true
+      return
+    }
+    
+    await processExerciseUpload(result, false)
+  } catch (error) {
+    console.error('Failed to upload exercises:', error)
+    uploadSuccess.value = false
+    uploadMessage.value = '习题上传失败，请重试'
+  }
+}
+
+const processExerciseUpload = async (result: { exercises: Exercise[]; imageId: string }, overwrite: boolean) => {
+  try {
+    if (overwrite) {
+      const exercisesData = await loadExercises()
+      const oldExerciseIds = exercisesData.exercises.map(e => e.id)
+      if (oldExerciseIds.length > 0) {
+        await deleteExercises(oldExerciseIds)
+      }
+    }
+    
     const exercisesToAdd = result.exercises.map(ex => ({
       type: ex.type,
+      questionNumber: ex.questionNumber,
       question: ex.question,
       options: ex.options,
       answer: ex.answer,
@@ -162,7 +193,7 @@ const handleExerciseUpload = async (result: { exercises: ParsedExercise[]; filen
     
     if (savedExercises.length > 0) {
       const today = new Date().toISOString().split('T')[0]
-      const taskName = `完成习题: ${result.filename.replace(/\.[^/.]+$/, '')}`
+      const taskName = `完成习题: ${today}`
       
       const exerciseIds = savedExercises.map(ex => ex.id)
       
@@ -193,10 +224,30 @@ const handleExerciseUpload = async (result: { exercises: ParsedExercise[]; filen
       }, 5000)
     }
   } catch (error) {
-    console.error('Failed to upload exercises:', error)
+    console.error('Failed to process exercise upload:', error)
     uploadSuccess.value = false
-    uploadMessage.value = '习题上传失败，请重试'
+    uploadMessage.value = '习题处理失败，请重试'
   }
+}
+
+const confirmOverwrite = async () => {
+  showOverwriteConfirm.value = false
+  if (pendingExercises.value) {
+    await processExerciseUpload(pendingExercises.value, true)
+    pendingExercises.value = null
+  }
+}
+
+const cancelOverwrite = () => {
+  showOverwriteConfirm.value = false
+  pendingExercises.value = null
+  uploadSuccess.value = true
+  uploadMessage.value = '已取消上传，保留原有习题数据'
+  
+  setTimeout(() => {
+    uploadSuccess.value = false
+    uploadMessage.value = ''
+  }, 3000)
 }
 </script>
 
@@ -294,11 +345,18 @@ const handleExerciseUpload = async (result: { exercises: ParsedExercise[]; filen
           >
             📝 习题上传
           </button>
+          <button
+            class="tab-btn flex-1 py-3 text-center font-medium transition-colors"
+            :class="activeTab === 'report' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-gray-500'"
+            @click="activeTab = 'report'"
+          >
+            📊 学习汇报
+          </button>
         </div>
       </div>
 
       <main class="main-content flex-1 max-w-7xl mx-auto w-full px-4 py-6">
-        <div class="content-grid grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+        <div class="content-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 h-full">
           <div
             class="task-section bg-white rounded-2xl shadow-lg p-6 transition-all"
             :class="{ 'hidden md:block': activeTab !== 'tasks' && isMobile }"
@@ -364,6 +422,13 @@ const handleExerciseUpload = async (result: { exercises: ParsedExercise[]; filen
               <ExerciseUploader @upload="handleExerciseUpload" />
             </div>
           </div>
+
+          <div
+            class="report-section transition-all"
+            :class="{ 'hidden md:block': activeTab !== 'report' && isMobile }"
+          >
+            <DailyLearningReport />
+          </div>
         </div>
       </main>
       
@@ -379,6 +444,47 @@ const handleExerciseUpload = async (result: { exercises: ParsedExercise[]; filen
         @close="closeTaskEditor"
         @save="handleTaskSave"
       />
+      
+      <Transition name="fade">
+        <div
+          v-if="showOverwriteConfirm"
+          class="overwrite-confirm-overlay fixed inset-0 flex items-center justify-center z-50 bg-black/30 backdrop-blur-sm"
+        >
+          <div class="overwrite-confirm-dialog bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+            <div class="dialog-header text-center mb-6">
+              <div class="icon-wrapper w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
+                <span class="text-3xl">⚠️</span>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-800">确认覆盖</h2>
+              <p class="text-gray-500 mt-2">当前已有习题数据，是否覆盖现有习题并创建新任务？</p>
+            </div>
+            
+            <div class="confirm-info mb-6 p-4 bg-gray-50 rounded-xl">
+              <p class="text-sm text-gray-600">
+                <span class="font-medium">新习题数量：</span>{{ pendingExercises?.exercises.length || 0 }} 道
+              </p>
+              <p class="text-sm text-gray-600 mt-1">
+                <span class="font-medium">操作说明：</span>选择"覆盖"将清除原有习题数据，上传新习题并创建新任务
+              </p>
+            </div>
+            
+            <div class="confirm-buttons flex gap-3">
+              <button
+                class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-xl transition-colors"
+                @click="cancelOverwrite"
+              >
+                取消
+              </button>
+              <button
+                class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors"
+                @click="confirmOverwrite"
+              >
+                覆盖
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </div>
   </div>
 </template>

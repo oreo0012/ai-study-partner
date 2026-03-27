@@ -6,7 +6,9 @@
 2. [本地开发部署](#本地开发部署)
 3. [生产环境部署](#生产环境部署)
 4. [配置说明](#配置说明)
-5. [常见问题](#常见问题)
+5. [数据存储](#数据存储)
+6. [路由说明](#路由说明)
+7. [常见问题](#常见问题)
 
 ---
 
@@ -82,12 +84,18 @@ pnpm install
 ### 步骤4: 启动开发服务器
 
 ```powershell
+cd apps/web
 pnpm dev
 ```
 
 ### 步骤5: 访问应用
 
-打开浏览器访问：`http://localhost:5173`
+| 页面 | 地址 | 说明 |
+|------|------|------|
+| 儿童主页 | http://localhost:5173/ | AI对话主界面 |
+| 家长管理页 | http://localhost:5173/parent | 任务管理和习题上传 |
+| 儿童任务页 | http://localhost:5173/tasks | 待办事项和进度 |
+| 习题练习页 | http://localhost:5173/practice | 习题练习 |
 
 ---
 
@@ -98,6 +106,7 @@ pnpm dev
 #### 步骤1: 构建生产版本
 
 ```powershell
+cd apps/web
 pnpm build
 ```
 
@@ -123,6 +132,11 @@ server {
     # 启用gzip压缩
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+
+    # 跨域设置（如需要API代理）
+    location /api/ {
+        proxy_pass http://your-api-server/;
+    }
 }
 ```
 
@@ -176,6 +190,58 @@ vercel
 
 ---
 
+## 数据存储
+
+### 数据文件位置
+
+V1.2版本新增的数据文件位于 `apps/web/public/data/` 目录：
+
+| 文件 | 说明 | 用途 |
+|------|------|------|
+| tasks.json | 任务数据 | 存储家长创建的学习任务 |
+| exercises.json | 习题数据 | 存储上传的习题内容 |
+| memory.json | 记忆数据 | 存储用户学习进度和历史 |
+
+### 数据备份
+
+系统会在以下情况自动备份数据：
+- 每日首次启动应用时
+- 记忆数据更新时
+
+备份文件命名格式：`memory_backup_YYYYMMDD.json`
+
+### 数据恢复
+
+如需恢复数据：
+1. 从备份目录找到对应的备份文件
+2. 替换 `memory.json` 文件
+
+---
+
+## 路由说明
+
+### 页面路由
+
+| 路径 | 页面 | 说明 | 访问控制 |
+|------|------|------|----------|
+| / | HomePage | 儿童主页，AI对话 | 无需验证 |
+| /parent | ParentPage | 家长管理页面 | 需要密码验证 |
+| /tasks | ChildTaskPage | 儿童任务页面 | 无需验证 |
+| /practice | PracticePage | 习题练习页面 | 无需验证 |
+
+### 家长页面密码
+
+默认密码：`123456`
+
+密码认证状态存储在浏览器localStorage中，首次登录后会自动记住。
+
+如需修改密码，请编辑 `apps/web/src/pages/ParentPage.vue` 第20行：
+```typescript
+const correctPassword = '您的密码'
+```
+
+---
+
 ## 常见问题
 
 ### Q: 启动后页面空白怎么办？
@@ -209,10 +275,22 @@ A: 检查以下项目：
 
 ### Q: 如何更换Live2D模型？
 
-A: 
+A:
 1. 将新模型文件放入 `public/assets/live2d/` 目录
 2. 修改 `config.json` 中的 `live2d.modelPath`
 3. 刷新页面
+
+### Q: 家长页面密码忘记了？
+
+A: 默认密码为 `123456`。如需重置，清除浏览器localStorage中的 `parent_authenticated` 项。
+
+### Q: 任务数据丢失怎么办？
+
+A: 检查 `apps/web/public/data/tasks.json` 文件是否存在且有正确数据。如有备份，可从备份文件恢复。
+
+### Q: 如何查看学习进度？
+
+A: 儿童用户可在首页进入"我的任务"页面查看进度统计，包括完成率、学习时长、连续天数等。
 
 ---
 
@@ -226,6 +304,14 @@ A:
 ---
 
 ## 更新日志
+
+### v1.2.0
+- **新增家长管理页面**：支持任务创建、编辑、删除
+- **新增习题上传功能**：支持.txt/.md文件格式
+- **新增儿童任务页面**：待办事项和进度可视化
+- **新增习题练习系统**：支持选择、填空、简答题型
+- **新增自主记忆系统**：学习进度追踪和个性化问候
+- **新增路由系统**：/parent, /tasks, /practice
 
 ### v1.0.0
 - 初始版本发布

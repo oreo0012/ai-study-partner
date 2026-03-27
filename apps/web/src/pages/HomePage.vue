@@ -2,18 +2,52 @@
 import type { EmotionType } from '@/services/emotion'
 import type { LipSyncResult } from '@/services/lipsync'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { useConfigStore, useChatStore, useLive2dStore } from '@/stores'
+import { useConfigStore, useChatStore, useLive2dStore, useMemoryStore } from '@/stores'
 import { Live2DStage, ChatArea } from '@/components'
 import { useLipSync } from '@/composables/useLipSync'
+import { memoryStartupCheckService } from '@/services/memory-startup-check'
+import { createChatProvider, streamChat } from '@/services'
 
 const configStore = useConfigStore()
 const chatStore = useChatStore()
 const live2dStore = useLive2dStore()
+const memoryStore = useMemoryStore()
 const { updateLipSync, resetLipSync } = useLipSync()
 
 const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 const live2dRef = ref<InstanceType<typeof Live2DStage> | null>(null)
+const isMemoryInitializing = ref(false)
+const personalizedGreeting = ref<string | null>(null)
+
+const createLLMCallFn = () => {
+  const llmConfig = configStore.llmConfig
+  if (!llmConfig?.apiKey) return undefined
+  
+  const provider = createChatProvider(llmConfig)
+  
+  return async (systemPrompt: string, userPrompt: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      let result = ''
+      try {
+        streamChat({
+          model: llmConfig.model,
+          provider,
+          systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+          temperature: 0.7,
+          maxTokens: 2048
+        }, {
+          onToken: (token) => { result += token },
+          onComplete: () => resolve(result),
+          onError: (err) => reject(err)
+        })
+      } catch (error) {
+        reject(error)
+      }
+    })
+  }
+}
 
 onMounted(async () => {
   try {
@@ -27,6 +61,18 @@ onMounted(async () => {
     chatStore.setEmotionCallback(handleEmotionChange)
     chatStore.setTTSCallback(handleLipSync)
     chatStore.initTTSService()
+    
+    await memoryStartupCheckService.checkAndProcessMemory(createLLMCallFn())
+    
+    isMemoryInitializing.value = true
+    await memoryStore.initializeMemory()
+    isMemoryInitializing.value = false
+    
+    await chatStore.loadTodayChatHistory()
+    
+    personalizedGreeting.value = await memoryStore.getPersonalizedGreeting()
+    console.log('Personalized greeting:', personalizedGreeting.value)
+    
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '加载配置失败'
     console.error('Failed to load config:', error)

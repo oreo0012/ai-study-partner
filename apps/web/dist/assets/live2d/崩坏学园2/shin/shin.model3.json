@@ -1,0 +1,49 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "shin.moc",
+		"Textures": [
+			"shin.2048/texture_00.png"
+		],
+		"Physics": "shin.physics3.json",
+		"Motions": {
+			"Idle": [
+				{"File": "motions/idle.mtn"},
+				{"File": "motions/3.mtn"},
+				{"File": "motions/8.mtn"}
+			],
+			"Flick": [
+				{"File": "motions/7.mtn"}
+			],
+			"Tap": [
+				{"File": "motions/6.mtn"}
+			],
+			"Shake": [
+				{"File": "motions/11.mtn"}
+			],
+			"Tap@Body": [
+				{"File": "motions/2.mtn"},
+				{"File": "motions/4.mtn"},
+				{"File": "motions/9.mtn"},
+				{"File": "motions/10.mtn"}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": ["ParamEyeLOpen", "ParamEyeROpen"]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": ["ParamMouthOpenY"]
+		}
+	],
+	"HitAreas": [
+		{"Id": "HitAreaHead", "Name": "Head"},
+		{"Id": "HitAreaFace", "Name": "Face"},
+		{"Id": "HitAreaBody", "Name": "Body"}
+	]
+}

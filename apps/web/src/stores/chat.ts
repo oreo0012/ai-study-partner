@@ -1,6 +1,7 @@
 import type { Message } from '@/services/types'
 import type { EmotionType } from '@/services/emotion'
 import type { LipSyncResult } from '@/services/lipsync'
+import type { ChatMessage } from '@/config/types'
 import { nanoid } from 'nanoid'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -18,6 +19,7 @@ import {
 } from '@/services'
 import { taskAgent } from '@/services/task-agent'
 import { createSummaryFromMessages, shouldTriggerSummary } from '@/services/memory'
+import { shortTermMemoryService } from '@/services/short-term-memory'
 
 export interface EmotionCallback {
   (emotion: EmotionType, intensity: number): void
@@ -48,6 +50,38 @@ export const useChatStore = defineStore('chat', () => {
   const ttsCallback = ref<TTSCallback | null>(null)
 
   const hasMessages = computed(() => messages.value.length > 0)
+
+  async function loadTodayChatHistory(): Promise<void> {
+    try {
+      const todayMessages = await shortTermMemoryService.getMessages()
+      
+      if (todayMessages.length > 0) {
+        const loadedMessages: Message[] = todayMessages.map(msg => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          createdAt: new Date(msg.timestamp).getTime()
+        }))
+        messages.value = loadedMessages
+        console.log(`Loaded ${loadedMessages.length} messages from today's chat history`)
+      }
+    } catch (error) {
+      console.error('Failed to load today chat history:', error)
+    }
+  }
+
+  async function saveMessageToShortTermMemory(
+    role: 'user' | 'assistant',
+    content: string,
+    messageType?: 'text' | 'voice' | 'emotion',
+    context?: { currentTask?: string; emotion?: string; intent?: string }
+  ): Promise<void> {
+    try {
+      await shortTermMemoryService.addMessage(role, content, messageType, context)
+    } catch (error) {
+      console.error('Failed to save message to short-term memory:', error)
+    }
+  }
 
   function setEmotionCallback(callback: EmotionCallback | null) {
     emotionCallback.value = callback
@@ -119,6 +153,12 @@ export const useChatStore = defineStore('chat', () => {
       createdAt: Date.now()
     }
     messages.value.push(message)
+    
+    saveMessageToShortTermMemory('user', content, 'text', {
+      currentTask: taskStore.pendingTasks[0]?.name,
+      emotion: currentEmotion.value
+    })
+    
     return message
   }
 
@@ -130,11 +170,28 @@ export const useChatStore = defineStore('chat', () => {
       createdAt: Date.now()
     }
     messages.value.push(message)
+    
+    saveMessageToShortTermMemory('assistant', content, 'text', {
+      emotion: currentEmotion.value
+    })
+    
     return message
   }
 
   async function sendMessage(userMessage: string): Promise<void> {
     if (isGenerating.value) return
+    
+    if (isPracticeIntent(userMessage)) {
+      const { selfPracticeSkill } = await import('@/skills/self-practice-skill')
+      await selfPracticeSkill.startPractice()
+      return
+    }
+    
+    const { selfPracticeSkill } = await import('@/skills/self-practice-skill')
+    if (selfPracticeSkill.isActive()) {
+      await selfPracticeSkill.submitAnswer(userMessage)
+      return
+    }
     
     const llmConfig = configStore.llmConfig
     const soulContent = configStore.soulContent
@@ -174,6 +231,11 @@ export const useChatStore = defineStore('chat', () => {
     let memoryContextPrompt = ''
     if (memoryContext) {
       memoryContextPrompt = `\n\n【用户记忆信息】\n${memoryContext}\n请根据用户的学习情况和历史记忆，提供个性化的学习建议和互动。`
+    }
+    
+    const fullMemoryContext = memoryStore.getContextForLLM()
+    if (fullMemoryContext) {
+      memoryContextPrompt = `\n\n${fullMemoryContext}\n请根据用户的学习情况和历史记忆，提供个性化的学习建议和互动。`
     }
 
     try {
@@ -250,6 +312,56 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function generateResponse(prompt: string): Promise<string> {
+    const llmConfig = configStore.llmConfig
+    if (!llmConfig) {
+      throw new Error('LLM config not found')
+    }
+    
+    try {
+      const provider = createChatProvider(llmConfig)
+      
+      let fullResponse = ''
+      
+      await streamChat({
+        model: llmConfig.model,
+        provider,
+        systemPrompt: '你是一位耐心、友好的小学老师，专门辅导小学生学习。',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        maxTokens: 500
+      }, {
+        signal: new AbortController().signal,
+        onToken: (token) => {
+          fullResponse += token
+        },
+        onComplete: () => {}
+      })
+      
+      return fullResponse
+    } catch (error) {
+      console.error('Failed to generate response:', error)
+      throw error
+    }
+  }
+
+  function isPracticeIntent(message: string): boolean {
+    const keywords = [
+      '开始自主练习',
+      '开始练习',
+      '开始答题',
+      '我要练习',
+      '做题目'
+    ]
+    
+    return keywords.some(keyword => message.includes(keyword))
+  }
+
   async function generateSummaryAndSave() {
     if (messages.value.length < 2) return
     
@@ -301,6 +413,9 @@ export const useChatStore = defineStore('chat', () => {
     setTTSCallback,
     toggleTTS,
     initTTSService,
-    speakText
+    speakText,
+    generateResponse,
+    loadTodayChatHistory,
+    saveMessageToShortTermMemory
   }
 })

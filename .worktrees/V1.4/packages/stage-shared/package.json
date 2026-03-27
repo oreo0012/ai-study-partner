@@ -1,0 +1,22 @@
+{
+  "name": "@ai-study-partner/stage-shared",
+  "type": "module",
+  "private": true,
+  "description": "Shared utilities for AI Study Partner",
+  "author": {
+    "name": "AI Study Partner Team"
+  },
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vueuse/core": "^12.0.0",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {}
+}
