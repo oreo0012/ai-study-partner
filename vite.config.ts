@@ -2,12 +2,15 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
 import { fileURLToPath, URL } from 'node:url'
+import path from 'node:path'
 
 export default defineConfig({
-  root: 'apps/web',
+  root: path.resolve(__dirname, 'apps/web'),
   plugins: [
     vue(),
-    UnoCSS(),
+    UnoCSS({
+      configFile: path.resolve(__dirname, 'apps/web/uno.config.ts')
+    }),
   ],
   resolve: {
     alias: {
@@ -17,12 +20,24 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
-    watch: {
-      ignored: ['**/airi-0.9.0-alpha.1/**', '**/packages/**', '**/node_modules/**']
+    proxy: {
+      '/api/modelscope': {
+        target: 'https://ms-ens-9a3765a1-f587.api-inference.modelscope.cn',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/modelscope/, '/v1')
+      },
+      '/api/volcengine': {
+        target: 'https://openspeech.bytedance.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/volcengine/, '/api/v3/tts'),
+        headers: {
+          'Connection': 'keep-alive'
+        }
+      }
     }
   },
   build: {
-    outDir: 'dist',
+    outDir: 'apps/web/dist',
     emptyOutDir: true
   }
 })

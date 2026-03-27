@@ -5,9 +5,9 @@
   "type": "module",
   "packageManager": "pnpm@10.30.3",
   "scripts": {
-    "dev": "vite --config apps/web/vite.config.ts",
-    "build": "vite build --config apps/web/vite.config.ts",
-    "preview": "vite preview --config apps/web/vite.config.ts",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit --project apps/web/tsconfig.json"
   },
   "dependencies": {
