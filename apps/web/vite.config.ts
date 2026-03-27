@@ -10,7 +10,9 @@ export default defineConfig({
   root: __dirname,
   plugins: [
     vue(),
-    UnoCSS(),
+    UnoCSS({
+      configFile: path.resolve(__dirname, 'uno.config.ts')
+    }),
   ],
   resolve: {
     alias: {
