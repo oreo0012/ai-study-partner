@@ -8,13 +8,14 @@
     "maxTokens": 2048
   },
   "tts": {
-    "provider": "volcengine",
-    "appId": "3026035956",
-    "apiKey": "8tgpjo6LzvCcjUPuhGaTZFiUZpOm7Ret",
-    "resourceId": "seed-tts-2.0",
-    "baseUrl": "/api/volcengine/unidirectional",
-    "model": "seed-tts-2.0-expressive",
-    "voice": "zh_female_peiqi_uranus_bigtts"
+    "provider": "minimax",
+    "apiKey": "sk-api-zOo6zLu0cC_R_lC8KstV9cwwnzbsfHh2QYx7kfLXSEEGr_jwmPRWonKohPaKu8hn0oETCNZhDUB0dLyWqj_l-nlQRu_1Bu0N8nqKqetDJeBFL0HPkFBLGak",
+    "appId": "2030841473657737496",
+    "baseUrl": "https://api.minimaxi.com/v1/t2a_v2",
+    "model": "speech-2.8-turbo",
+    "voice": "Chinese (Mandarin)_Cute_Spirit",
+    "speed": 1.1,
+    "pitch": 1
   },
   "stt": {
     "provider": "openai",
@@ -24,7 +25,7 @@
     "language": "zh-CN"
   },
   "character": {
-    "name": "小伴",
+    "name": "juju",
     "personality": "活泼、耐心、鼓励、友善"
   },
   "soul": {
@@ -36,5 +37,25 @@
     "scale": 1.0,
     "positionX": 0,
     "positionY": 0
+  },
+  "vision": {
+    "provider": "siliconflow",
+    "apiKey": "sk-logdtwnrtanvmexdcfcyoodmoombdzvdkbjamrrjmnisdjej",
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "model": "Qwen/Qwen3-VL-32B-Instruct",
+    "timeout": 120000,
+    "maxRetries": 3,
+    "models": {
+      "fast": {
+        "model": "Qwen/Qwen3-VL-32B-Instruct",
+        "name": "快速识别",
+        "description": "速度优先，适合简单试卷"
+      },
+      "precise": {
+        "model": "Qwen/Qwen3.5-397B-A17B",
+        "name": "精确识别",
+        "description": "精准优先，适合复杂试卷"
+      }
+    }
   }
 }

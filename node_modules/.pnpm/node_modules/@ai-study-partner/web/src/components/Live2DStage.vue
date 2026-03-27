@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { EmotionType, Live2DExpressionParams } from '@/services/emotion'
+import { EMOTION_MAPPINGS } from '@/services/emotion'
+import { live2dCache } from '@/services/live2d-cache'
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useMouse } from '@vueuse/core'
 
@@ -8,6 +11,7 @@ interface Props {
   positionX?: number
   positionY?: number
   paused?: boolean
+  preloadOnMount?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -15,7 +19,8 @@ const props = withDefaults(defineProps<Props>(), {
   scale: 1,
   positionX: 0,
   positionY: 0,
-  paused: false
+  paused: false,
+  preloadOnMount: true
 })
 
 const emit = defineEmits<{
@@ -144,9 +149,17 @@ async function initModel() {
   })
 
   try {
-    model = await Live2DModel.from(props.modelPath, {
-      autoInteract: false,
-    })
+    const cachedModel = live2dCache.getCachedModel(props.modelPath)
+    
+    if (cachedModel) {
+      model = cachedModel
+    } else {
+      model = await Live2DModel.from(props.modelPath, {
+        autoInteract: false,
+      })
+      
+      live2dCache.cacheModel(props.modelPath, model)
+    }
 
     model.anchor.set(0.5, 0.5)
     model.scale.set(props.scale * 0.25)
@@ -155,7 +168,6 @@ async function initModel() {
 
     app.stage.addChild(model)
     
-    // 播放待机动画
     if (model.motion) {
       model.motion('Idle')
     }
@@ -220,10 +232,96 @@ function speak(audioBuffer: ArrayBuffer) {
   }
 }
 
+function setExpressionByEmotion(emotion: EmotionType, intensity: number = 1.0) {
+  if (!model) return
+  
+  const mapping = EMOTION_MAPPINGS[emotion]
+  if (!mapping) return
+  
+  const params = mapping.params
+  const duration = mapping.transitionDuration
+  
+  applyExpressionParams(params, intensity, duration)
+}
+
+function applyExpressionParams(params: Live2DExpressionParams, intensity: number = 1.0, duration: number = 300) {
+  if (!model || !model.internalModel) return
+  
+  const coreModel = model.internalModel.coreModel
+  if (!coreModel) return
+  
+  const clampedIntensity = Math.max(0, Math.min(1, intensity))
+  
+  for (const [paramName, value] of Object.entries(params)) {
+    if (value === undefined) continue
+    
+    const paramId = paramName
+    const targetValue = value * clampedIntensity
+    
+    try {
+      const currentValue = coreModel.getParameterValueById(paramId)
+      animateParameter(coreModel, paramId, currentValue, targetValue, duration)
+    } catch {
+      // Parameter may not exist on this model
+    }
+  }
+}
+
+function animateParameter(
+  coreModel: any,
+  paramId: string,
+  fromValue: number,
+  toValue: number,
+  duration: number
+) {
+  const startTime = performance.now()
+  
+  function updateParameter(currentTime: number) {
+    const elapsed = currentTime - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    
+    const easeProgress = 1 - Math.pow(1 - progress, 3)
+    
+    const currentValue = fromValue + (toValue - fromValue) * easeProgress
+    
+    try {
+      coreModel.setParameterValueById(paramId, currentValue)
+    } catch {
+      return
+    }
+    
+    if (progress < 1) {
+      requestAnimationFrame(updateParameter)
+    }
+  }
+  
+  requestAnimationFrame(updateParameter)
+}
+
+function setMouthOpenY(value: number) {
+  if (!model || !model.internalModel) return
+  
+  const coreModel = model.internalModel.coreModel
+  if (!coreModel) return
+  
+  try {
+    coreModel.setParameterValueById('ParamMouthOpenY', Math.max(0, Math.min(1, value)))
+  } catch {
+    // Parameter may not exist
+  }
+}
+
+function resetExpression() {
+  setExpressionByEmotion('neutral', 1.0)
+}
+
 defineExpose({
   setExpression,
   playMotion,
   speak,
+  setExpressionByEmotion,
+  setMouthOpenY,
+  resetExpression,
   isLoaded
 })
 </script>

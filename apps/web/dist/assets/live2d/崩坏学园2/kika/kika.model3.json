@@ -1,0 +1,47 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "kika.moc",
+		"Textures": [
+			"kika.2048/texture_00.png"
+		],
+		"Physics": "kika.physics3.json",
+		"Motions": {
+			"Idle": [
+               	{"File": "motions/idle.mtn"},
+               	{"File": "motions/5_1.mtn"},
+               	{"File": "motions/6_1.mtn"}
+            ],
+           	"Flick": [
+               	{"File": "motions/1.mtn"}
+            ],
+           	"Tap": [
+                {"File": "motions/2_1.mtn"}
+            ],
+           	"Shake": [
+               	{"File": "motions/7_1.mtn"}
+            ],
+           	"Tap@Body": [
+               	{"File": "motions/3_1.mtn"},
+               	{"File": "motions/4_1.mtn"}
+            ]
+        }
+    },
+    "Groups": [
+        {
+            "Target": "Parameter",
+            "Name": "EyeBlink",
+            "Ids": ["ParamEyeLOpen", "ParamEyeROpen"]
+        },
+        {
+            "Target": "Parameter",
+            "Name": "LipSync",
+            "Ids": ["ParamMouthOpenY"]
+        }
+    ],
+    "HitAreas": [
+        {"Id": "HitAreaHead", "Name": "Head"},
+        {"Id": "HitAreaFace", "Name": "Face"},
+        {"Id": "HitAreaBody", "Name": "Body"}
+    ]
+}

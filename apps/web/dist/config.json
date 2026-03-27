@@ -1,0 +1,49 @@
+{
+  "llm": {
+    "provider": "minimax",
+    "apiKey": "sk-api-LEiCLNPoI5Uf8kyFWJ52m6xm4OxBwf-hNOPY8IJggXieUZO7p427OTzg6PKA_oJk7DAyC77xwMU0vUJXQbHLBx7DhdZEnLbBzUcCjW_JRq8qH9ASJ3kjV3o",
+    "baseUrl": "https://api.minimaxi.com/v1/",
+    "model": "MiniMax-M2.7",
+    "temperature": 1.0,
+    "maxTokens": 2048
+  },
+  "tts": {
+    "provider": "minimax",
+    "apiKey": "sk-api-zOo6zLu0cC_R_lC8KstV9cwwnzbsfHh2QYx7kfLXSEEGr_jwmPRWonKohPaKu8hn0oETCNZhDUB0dLyWqj_l-nlQRu_1Bu0N8nqKqetDJeBFL0HPkFBLGak",
+    "appId": "2030841473657737496",
+    "baseUrl": "https://api.minimaxi.com/v1/t2a_v2",
+    "model": "speech-2.8-turbo",
+    "voice": "Chinese (Mandarin)_Cute_Spirit",
+    "speed": 1.1,
+    "pitch": 1
+  },
+  "stt": {
+    "provider": "openai",
+    "apiKey": "",
+    "baseUrl": "https://api.openai.com/v1/",
+    "model": "whisper-1",
+    "language": "zh-CN"
+  },
+  "character": {
+    "name": "juju",
+    "personality": "活泼、耐心、鼓励、友善"
+  },
+  "soul": {
+    "path": "/soul.md",
+    "enabled": true
+  },
+  "live2d": {
+    "modelPath": "/assets/live2d/hiyori_free_zh/runtime/hiyori_free_t08.model3.json",
+    "scale": 1.0,
+    "positionX": 0,
+    "positionY": 0
+  },
+  "vision": {
+    "provider": "siliconflow",
+    "apiKey": "sk-logdtwnrtanvmexdcfcyoodmoombdzvdkbjamrrjmnisdjej",
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "model": "Qwen/Qwen3.5-397B-A17B",
+    "timeout": 30000,
+    "maxRetries": 2
+  }
+}

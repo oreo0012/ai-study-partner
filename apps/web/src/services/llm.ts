@@ -1,5 +1,6 @@
 import type { Message } from '@/services/types'
 import { ThinkFilter, filterThinkTags } from './think-filter'
+import { FormatFilter, filterSpecialChars } from './format-filter'
 
 export interface StreamOptions {
   onToken?: (token: string) => void
@@ -7,6 +8,7 @@ export interface StreamOptions {
   onError?: (error: Error) => void
   signal?: AbortSignal
   enableThinkFilter?: boolean
+  enableFormatFilter?: boolean
 }
 
 export interface ChatOptions {
@@ -20,16 +22,16 @@ export interface ChatOptions {
 
 export async function streamChat(options: ChatOptions, streamOptions: StreamOptions = {}): Promise<string> {
   const { model, provider, systemPrompt, messages, temperature, maxTokens } = options
-  const { onToken, onComplete, onError, signal, enableThinkFilter = true } = streamOptions
+  const { onToken, onComplete, onError, signal, enableThinkFilter = true, enableFormatFilter = true } = streamOptions
 
   const chatConfig = provider.chat(model)
-  
+
   const apiMessages: Array<{ role: string; content: string }> = []
-  
+
   if (systemPrompt) {
     apiMessages.push({ role: 'system', content: systemPrompt })
   }
-  
+
   for (const msg of messages) {
     apiMessages.push({
       role: msg.role,
@@ -38,6 +40,7 @@ export async function streamChat(options: ChatOptions, streamOptions: StreamOpti
   }
 
   const thinkFilter = new ThinkFilter({ enableStreamFilter: true })
+  const formatFilter = new FormatFilter({ enableStreamFilter: true })
 
   try {
     const response = await fetch(`${chatConfig.baseURL}chat/completions`, {
@@ -87,14 +90,19 @@ export async function streamChat(options: ChatOptions, streamOptions: StreamOpti
             const content = parsed.choices?.[0]?.delta?.content
             if (content) {
               fullText += content
-              
+
+              let filteredContent = content
+
               if (enableThinkFilter) {
-                const filteredContent = thinkFilter.filterStream(content)
-                if (filteredContent) {
-                  onToken?.(filteredContent)
-                }
-              } else {
-                onToken?.(content)
+                filteredContent = thinkFilter.filterStream(filteredContent)
+              }
+
+              if (enableFormatFilter && filteredContent) {
+                filteredContent = formatFilter.filterStream(filteredContent)
+              }
+
+              if (filteredContent) {
+                onToken?.(filteredContent)
               }
             }
           } catch {
@@ -104,12 +112,16 @@ export async function streamChat(options: ChatOptions, streamOptions: StreamOpti
       }
     }
 
-    const finalFilteredText = enableThinkFilter 
+    const finalFilteredText = enableThinkFilter
       ? thinkFilter.finalize(fullText)
       : filterThinkTags(fullText)
-    
-    onComplete?.(finalFilteredText)
-    return finalFilteredText
+
+    const finalText = enableFormatFilter
+      ? formatFilter.finalize(finalFilteredText)
+      : filterSpecialChars(finalFilteredText)
+
+    onComplete?.(finalText)
+    return finalText
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error))
     onError?.(err)

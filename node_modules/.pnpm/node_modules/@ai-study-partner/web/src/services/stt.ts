@@ -1,8 +1,16 @@
-import type { TranscriptionProvider } from './providers/types'
+import type { TranscriptionProvider } from './providers/factory'
+import { VADDetector, type VADState, type VADConfig } from './vad'
 
 export interface STTOptions {
   language?: string
   signal?: AbortSignal
+}
+
+export interface STTCallbacks {
+  onVADStateChange?: (state: VADState) => void
+  onSpeechStart?: () => void
+  onSpeechEnd?: () => void
+  onTranscription?: (text: string) => void
 }
 
 export class STTService {
@@ -10,9 +18,18 @@ export class STTService {
   private mediaStream: MediaStream | null = null
   private mediaRecorder: MediaRecorder | null = null
   private audioChunks: Blob[] = []
+  private vadDetector: VADDetector | null = null
+  private callbacks: STTCallbacks = {}
+  private isRecording = false
+  private autoStopEnabled = true
+  private lastSpeechTime = 0
 
   constructor(provider: TranscriptionProvider) {
     this.provider = provider
+  }
+
+  setCallbacks(callbacks: STTCallbacks): void {
+    this.callbacks = callbacks
   }
 
   async requestMicrophoneAccess(): Promise<MediaStream> {
@@ -31,12 +48,49 @@ export class STTService {
     return this.mediaStream
   }
 
+  async initializeVAD(config?: VADConfig): Promise<void> {
+    if (!this.mediaStream) {
+      await this.requestMicrophoneAccess()
+    }
+
+    this.vadDetector = new VADDetector({
+      energyThreshold: 0.015,
+      silenceDuration: 20,
+      speechDuration: 5,
+      ...config
+    })
+
+    await this.vadDetector.initialize(this.mediaStream!)
+    
+    this.vadDetector.onStateChange((state) => {
+      this.callbacks.onVADStateChange?.(state)
+      
+      if (state.isSpeaking && !state.isSpeechDetected) {
+        this.callbacks.onSpeechStart?.()
+      }
+      
+      if (!state.isSpeaking && state.silenceFrames >= 20) {
+        this.callbacks.onSpeechEnd?.()
+        
+        if (this.autoStopEnabled && this.isRecording && Date.now() - this.lastSpeechTime > 1500) {
+          this.stopAndTranscribe()
+        }
+      }
+      
+      if (state.isSpeaking) {
+        this.lastSpeechTime = Date.now()
+      }
+    })
+  }
+
   startRecording(): void {
     if (!this.mediaStream) {
       throw new Error('Microphone not initialized. Call requestMicrophoneAccess first.')
     }
 
     this.audioChunks = []
+    this.isRecording = true
+    this.lastSpeechTime = Date.now()
     
     const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
     this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType })
@@ -48,9 +102,19 @@ export class STTService {
     }
 
     this.mediaRecorder.start(100)
+    
+    if (this.vadDetector) {
+      this.vadDetector.start()
+    }
   }
 
   async stopRecording(): Promise<Blob> {
+    this.isRecording = false
+    
+    if (this.vadDetector) {
+      this.vadDetector.stop()
+    }
+    
     return new Promise((resolve) => {
       if (!this.mediaRecorder) {
         resolve(new Blob())
@@ -66,6 +130,27 @@ export class STTService {
 
       this.mediaRecorder.stop()
     })
+  }
+
+  private async stopAndTranscribe(): Promise<void> {
+    if (!this.isRecording) return
+    
+    const audioBlob = await this.stopRecording()
+    
+    if (audioBlob.size > 1000) {
+      try {
+        const text = await this.transcribe(audioBlob)
+        if (text.trim()) {
+          this.callbacks.onTranscription?.(text)
+        }
+      } catch (error) {
+        console.error('Transcription error:', error)
+      }
+    }
+  }
+
+  setAutoStop(enabled: boolean): void {
+    this.autoStopEnabled = enabled
   }
 
   async transcribe(audioBlob: Blob, options: STTOptions = {}): Promise<string> {
@@ -97,6 +182,11 @@ export class STTService {
   }
 
   releaseMicrophone(): void {
+    if (this.vadDetector) {
+      this.vadDetector.dispose()
+      this.vadDetector = null
+    }
+    
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(track => track.stop())
       this.mediaStream = null

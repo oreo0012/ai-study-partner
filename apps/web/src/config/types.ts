@@ -45,6 +45,12 @@ export interface Live2DConfig {
   positionY: number
 }
 
+export interface VisionModelConfig {
+  model: string
+  name: string
+  description: string
+}
+
 export interface VisionConfig {
   provider: 'siliconflow'
   apiKey: string
@@ -52,6 +58,10 @@ export interface VisionConfig {
   model: string
   timeout: number
   maxRetries: number
+  models?: {
+    fast?: VisionModelConfig
+    precise?: VisionModelConfig
+  }
 }
 
 export interface AppConfig {
@@ -102,6 +112,7 @@ export type ExerciseType = '选择题' | '填空题' | '简答题' | '口算题'
 export interface Exercise {
   id: string
   type: ExerciseType
+  questionNumber?: string
   question: string
   options?: string[]
   answer: string

@@ -23,7 +23,7 @@ export const useTaskStore = defineStore('task', () => {
   })
 
   const pendingTasks = computed(() => {
-    return tasks.value.filter(task => task.status === '待完成')
+    return tasks.value.filter(task => task.status === '未完成')
   })
 
   const completedTasks = computed(() => {

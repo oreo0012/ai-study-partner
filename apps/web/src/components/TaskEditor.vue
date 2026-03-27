@@ -22,7 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const taskTypes: TaskType[] = ['学习', '练习', '阅读', '其他']
-const taskStatuses: TaskStatus[] = ['待完成', '进行中', '已完成']
+const taskStatuses: TaskStatus[] = ['未完成', '已完成']
 
 const availableDates = computed(() => {
   const dates = []
@@ -50,7 +50,7 @@ const formData = ref<TaskEditData>({
   type: '学习',
   estimatedTime: 30,
   date: new Date().toISOString().split('T')[0],
-  status: '待完成'
+  status: '未完成'
 })
 
 const errors = ref<Record<string, string>>({})

@@ -1,4 +1,5 @@
 import type { LLMConfig, TTSConfig, STTConfig } from '@/config/types'
+import { MinimaxTTSProvider, type MinimaxTTSConfig } from './minimax'
 import { VolcengineTTSProvider, type VolcengineTTSConfig } from './volcengine'
 
 export interface ChatProvider {
@@ -54,6 +55,21 @@ export function createSpeechProvider(config: TTSConfig): SpeechProvider {
     }
   }
 
+  if (config.provider === 'minimax') {
+    const minimaxConfig: MinimaxTTSConfig = {
+      apiKey: config.apiKey,
+      groupId: config.appId,
+      voiceId: config.voice,
+      model: config.model as MinimaxTTSConfig['model'],
+      speed: config.speed
+    }
+    const provider = new MinimaxTTSProvider(minimaxConfig, config.baseUrl)
+    return {
+      speech: (model: string, voice?: string) => provider.speech(model, voice),
+      synthesize: (text: string, signal?: AbortSignal) => provider.synthesize(text, signal)
+    }
+  }
+
   return {
     speech: (model: string, voice?: string) => ({
       baseURL: config.baseUrl,
@@ -74,5 +90,5 @@ export function createTranscriptionProvider(config: STTConfig): TranscriptionPro
   }
 }
 
-export { VolcengineTTSProvider }
-export type { VolcengineTTSConfig }
+export { MinimaxTTSProvider, VolcengineTTSProvider }
+export type { MinimaxTTSConfig, VolcengineTTSConfig }

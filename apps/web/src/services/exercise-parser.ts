@@ -2,6 +2,7 @@ import type { Exercise, ExerciseType } from '@/config/types'
 
 export interface ParsedExercise {
   type: ExerciseType
+  questionNumber?: string
   question: string
   options?: string[]
   answer: string

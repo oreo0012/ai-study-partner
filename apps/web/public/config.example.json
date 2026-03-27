@@ -362,9 +362,9 @@ MiniMax 提供高质量的语音合成服务，支持多种模型和音色。
     "provider": "siliconflow",
     "apiKey": "your-siliconflow-api-key",
     "baseUrl": "https://api.siliconflow.cn/v1",
-    "model": "Qwen/Qwen3.5-397B-A17B",
-    "timeout": 30000,
-    "maxRetries": 2
+    "model": "Qwen/Qwen2-VL-72B-Instruct",
+    "timeout": 60000,
+    "maxRetries": 3
   }
 }
 ```
