@@ -1,7 +1,8 @@
 {
-  "buildCommand": "cd apps/web && pnpm build",
-  "outputDirectory": "apps/web/dist",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
   "framework": "vite",
+  "rootDirectory": "apps/web",
   "rewrites": [
     {
       "source": "/(.*)",
