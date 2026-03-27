@@ -5,20 +5,30 @@
   "type": "module",
   "packageManager": "pnpm@10.30.3",
   "scripts": {
-    "dev": "cd apps/web && vite",
-    "build": "cd apps/web && vite build",
-    "preview": "cd apps/web && vite preview",
-    "typecheck": "cd apps/web && vue-tsc --noEmit"
+    "dev": "vite --config apps/web/vite.config.ts",
+    "build": "vite build --config apps/web/vite.config.ts",
+    "preview": "vite preview --config apps/web/vite.config.ts",
+    "typecheck": "vue-tsc --noEmit --project apps/web/tsconfig.json"
+  },
+  "dependencies": {
+    "@vueuse/core": "^12.0.0",
+    "nanoid": "^5.1.6",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "vite": "^6.0.5",
-    "@vitejs/plugin-vue": "^5.2.1",
-    "typescript": "~5.7.2",
-    "vue-tsc": "^2.2.0",
-    "unocss": "^66.0.0",
-    "@unocss/preset-uno": "^66.0.0",
+    "@iconify-json/carbon": "^1.2.0",
+    "@types/node": "^25.5.0",
     "@unocss/preset-icons": "^66.0.0",
+    "@unocss/preset-uno": "^66.0.0",
     "@unocss/preset-web-fonts": "^66.0.0",
-    "@iconify-json/carbon": "^1.2.0"
+    "@vitejs/plugin-vue": "^5.2.1",
+    "jsdom": "^29.0.1",
+    "typescript": "~5.7.2",
+    "unocss": "^66.0.0",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.0",
+    "vue-tsc": "^2.2.0"
   }
 }
