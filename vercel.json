@@ -1,6 +1,6 @@
 {
-  "installCommand": "pnpm install --force",
-  "buildCommand": "node ./node_modules/vite/bin/vite.js build --config ./vite.config.ts",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm build",
   "outputDirectory": "apps/web/dist",
   "framework": "vite",
   "rewrites": [

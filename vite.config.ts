@@ -8,9 +8,7 @@ export default defineConfig({
   root: path.resolve(__dirname, 'apps/web'),
   plugins: [
     vue(),
-    UnoCSS({
-      configFile: path.resolve(__dirname, 'apps/web/uno.config.ts')
-    }),
+    UnoCSS(),
   ],
   resolve: {
     alias: {
@@ -37,7 +35,7 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'apps/web/dist',
+    outDir: 'dist',
     emptyOutDir: true
   }
 })
