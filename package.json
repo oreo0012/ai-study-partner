@@ -19,7 +19,10 @@
   },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.0",
+    "@iconify/utils": "^2.1.33",
     "@types/node": "^25.5.0",
+    "@unocss/core": "^66.0.0",
+    "@unocss/preset-attributify": "^66.0.0",
     "@unocss/preset-icons": "^66.0.0",
     "@unocss/preset-uno": "^66.0.0",
     "@unocss/preset-web-fonts": "^66.0.0",
