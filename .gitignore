@@ -9,3 +9,8 @@ dist
 .env
 .env.*
 !.env.example
+
+# Config files with sensitive data
+apps/web/public/config.json
+apps/web/public/config.production.json
+apps/web/public/config.local.json
